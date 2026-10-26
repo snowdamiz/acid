@@ -23,6 +23,10 @@ export const CLI_RUNTIME_EXTERNAL_PREFIXES = [
   "@napi-rs/keyring",
   "@clerk/electron-passkeys",
   "node-gyp-build",
+  // cbor-x's optional native decoder resolves its prebuild beside its own file, so inlined it
+  // never loads. Where it is absent, cbor-x falls back to JavaScript.
+  "cbor-extract",
+  "@cbor-extract/",
   // node-gyp-build-optional-packages, the loader behind cbor-x's optional native decoder, needs it.
   "detect-libc",
   "node-addon-api",
