@@ -40,7 +40,9 @@ import * as McpToolAccess from "./McpToolAccess.ts";
 import * as OrchestratorMcpService from "./OrchestratorMcpService.ts";
 import { PreviewControlsToolkit } from "./toolkits/previewControls/tools.ts";
 import * as PreviewControlsHandlers from "./toolkits/previewControls/handlers.ts";
+import { CloudToolkit } from "./toolkits/cloud/tools.ts";
 import { EnvironmentToolkit } from "./toolkits/environment/tools.ts";
+import * as CloudHandlers from "./toolkits/cloud/handlers.ts";
 import * as EnvironmentHandlers from "./toolkits/environment/handlers.ts";
 import { ProjectToolkit } from "./toolkits/project/tools.ts";
 import * as ProjectHandlers from "./toolkits/project/handlers.ts";
@@ -773,6 +775,7 @@ const HANDOFF_TOOLS: ReadonlySet<string> = new Set([
   "delegate_task",
   "create_threads",
   "t3_thread_launch",
+  "t3_cloud_chat_launch",
   "t3_thread_send",
   "t3_thread_send_attachments",
   "t3_thread_fork",
@@ -1034,6 +1037,8 @@ const layerEnvironmentToolkit = toolkitRegistration(
 
 const layerProjectRegistration = toolkitRegistration(ProjectToolkit, ProjectHandlers.layer);
 
+const layerCloudRegistration = toolkitRegistration(CloudToolkit, CloudHandlers.layer);
+
 const layerHomeRegistration = toolkitRegistration(HomeToolkit, HomeHandlers.layer);
 
 export const layerAttachmentToolkit = toolkitRegistration(
@@ -1075,6 +1080,7 @@ export const layer = Layer.mergeAll(
   layerThreadToolkit,
   layerAttachmentToolkit,
   layerProjectRegistration,
+  layerCloudRegistration,
   layerHomeRegistration,
   layerEnvironmentToolkit,
   layerPreviewControlsRegistration,
