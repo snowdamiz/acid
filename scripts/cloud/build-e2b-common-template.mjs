@@ -17,6 +17,8 @@ const { values } = NodeUtil.parseArgs({
     name: { type: "string", default: "t3-common-tools-node24-bun140-v8" },
     "cpu-count": { type: "string", default: "8" },
     "memory-mb": { type: "string", default: "16384" },
+    "min-free-disk-mb": { type: "string", default: "51200" },
+    "swap-gb": { type: "string", default: "8" },
     config: {
       type: "string",
       default: NodePath.join(NodeOS.homedir(), ".t3/environment-control.json"),
@@ -28,10 +30,10 @@ const { values } = NodeUtil.parseArgs({
 });
 if (values.help) {
   console.log(
-    "Usage: node scripts/cloud/build-e2b-common-template.mjs --output DIRECTORY [--name NAME] [--cpu-count N] [--memory-mb N] [--config FILE] [--print-dockerfile]",
+    "Usage: node scripts/cloud/build-e2b-common-template.mjs --output DIRECTORY [--name NAME] [--cpu-count N] [--memory-mb N] [--min-free-disk-mb N] [--swap-gb N] [--config FILE] [--print-dockerfile]",
   );
   console.log(
-    "Builds a clean private E2B template with --cpu-count vCPUs (default 8, the E2B Pro maximum), --memory-mb of RAM (default 16384, the limit E2B set for this team), 8 GiB swap and 50 GiB free disk. Copies only the public installer recipe. Does not change environment-control configuration.",
+    "Builds a clean private E2B template with --cpu-count vCPUs (default 8, the E2B Pro maximum), --memory-mb of RAM (default 16384, the limit E2B set for this team), --swap-gb of swap (default 8, 0 for none) and --min-free-disk-mb of free disk (default 51200; E2B caps it per team). Copies only the public installer recipe. Does not change environment-control configuration.",
   );
   process.exit(0);
 }
@@ -41,8 +43,14 @@ if (!Number.isInteger(cpuCount) || cpuCount < 1)
 const memoryMB = Number(values["memory-mb"]);
 if (!Number.isInteger(memoryMB) || memoryMB < 1)
   throw new Error("--memory-mb must be a positive integer");
+const minFreeDiskMb = Number(values["min-free-disk-mb"]);
+if (!Number.isInteger(minFreeDiskMb) || minFreeDiskMb < 1)
+  throw new Error("--min-free-disk-mb must be a positive integer");
+const swapGb = Number(values["swap-gb"]);
+if (!Number.isInteger(swapGb) || swapGb < 0)
+  throw new Error("--swap-gb must be a non-negative integer");
 
-const template = COMMON_TOOLS_STEPS.reduce(
+const tools = COMMON_TOOLS_STEPS.reduce(
   (built, step) => {
     if ("user" in step) return built.setUser(step.user);
     if ("copy" in step) return built.copy(step.copy, step.to, { mode: step.mode });
@@ -53,11 +61,18 @@ const template = COMMON_TOOLS_STEPS.reduce(
   Template({
     fileContextPath: NodeURL.fileURLToPath(new URL("./", import.meta.url)),
   }).fromImage(COMMON_TOOLS_BASE),
-)
-  // Sandboxes resume from the VM that ran the start command, not the build-step VM,
-  // so the swapon belongs in the start command.
-  .runCmd("sudo fallocate -l 8G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile")
-  .setStartCmd("sudo swapon /swapfile", "grep -q '^/swapfile ' /proc/swaps");
+);
+// A team whose build disk cannot hold a swap file beside the tools passes 0.
+const template =
+  swapGb === 0
+    ? tools
+    : tools
+        // Sandboxes resume from the VM that ran the start command, not the build-step VM,
+        // so the swapon belongs in the start command.
+        .runCmd(
+          `sudo fallocate -l ${swapGb}G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile`,
+        )
+        .setStartCmd("sudo swapon /swapfile", "grep -q '^/swapfile ' /proc/swaps");
 
 if (values["print-dockerfile"]) {
   console.log(Template.toDockerfile(template));
@@ -79,7 +94,7 @@ try {
     apiKey,
     cpuCount,
     memoryMB,
-    minFreeDiskMb: 51200,
+    minFreeDiskMb,
     onBuildLogs: (entry) => {
       const line = JSON.stringify(entry).replaceAll(apiKey, "[redacted]");
       NodeFS.writeSync(log.fd, `${line}\n`);
