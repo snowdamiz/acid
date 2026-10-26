@@ -7,7 +7,7 @@
  *
  * Exit codes: the command's own, 124 when it timed out, 70 when its copy was lost, and 75 when no
  * copy could start, so a wrapper can run the command here instead. When the socket closes under a
- * running copy, as when T3 Code restarts, it rejoins the job for up to ten minutes and exits as the
+ * running copy, as when Acid restarts, it rejoins the job for up to ten minutes and exits as the
  * command did; only a job it cannot rejoin is lost.
  */
 import * as NodeChildProcess from "node:child_process";
@@ -29,7 +29,7 @@ import {
 const FORK_UNAVAILABLE_EXIT = 75;
 const FORK_LOST_EXIT = 70;
 const TIMED_OUT_EXIT = 124;
-/** How long a caller whose socket closed keeps trying to rejoin its job, as T3 Code restarts. */
+/** How long a caller whose socket closed keeps trying to rejoin its job, as Acid restarts. */
 const REJOIN_WINDOW_MS = 10 * 60_000;
 const REJOIN_MAX_DELAY_MS = 10_000;
 /** A copy reports the last 4,000 bytes of each stream. */
@@ -207,11 +207,11 @@ export async function runForkExec(
   const job: string = jobId;
   const windowMs = options.rejoinWindowMs ?? REJOIN_WINDOW_MS;
   process.stderr.write(
-    `[t3] Lost the connection to T3 Code, which may be restarting; rejoining job ${job} for up to ${Math.round(windowMs / 60_000)} minutes.\n`,
+    `[t3] Lost the connection to Acid, which may be restarting; rejoining job ${job} for up to ${Math.round(windowMs / 60_000)} minutes.\n`,
   );
   let waited = 0;
   let delay = 250;
-  let reason = "T3 Code did not answer in time";
+  let reason = "Acid did not answer in time";
   for (;;) {
     const attempt = await exchange(
       JSON.stringify({ attach: job, stdoutBytes: seen.stdout, stderrBytes: seen.stderr }),
@@ -219,7 +219,7 @@ export async function runForkExec(
     );
     if (attempt.code !== null) return attempt.code;
     if (attempt.refused !== undefined) {
-      reason = `this T3 Code cannot rejoin jobs (${attempt.refused})`;
+      reason = `this Acid cannot rejoin jobs (${attempt.refused})`;
       break;
     }
     if (waited + delay > windowMs) break;

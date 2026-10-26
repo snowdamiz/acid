@@ -7,7 +7,7 @@
  * while the server is still small. Children read and write their stdio sockets in the server
  * directly, and the server signals them by pid; only the exit status comes from the host.
  *
- * Once the Node that T3 Code ships bundles libuv 1.53 (posix_spawn), `spawnsThroughHost` turns
+ * Once the Node that Acid ships bundles libuv 1.53 (posix_spawn), `spawnsThroughHost` turns
  * this off. Then delete this module, `spawnHostProcess.ts`, the `__spawn-host` command, and the
  * host's case in `ProcessGroupMetrics`.
  */

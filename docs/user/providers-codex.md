@@ -1,18 +1,18 @@
 # Codex
 
-Use your ChatGPT plan or an existing Codex CLI login to code in T3 Code.
+Use your ChatGPT plan or an existing Codex CLI login to code in Acid.
 
 ## Connect with ChatGPT
 
 Connect during onboarding or in **Settings → Providers**. For a remote machine,
-select that environment first. T3 Code handles Codex installation; sign in on
+select that environment first. Acid handles Codex installation; sign in on
 OpenAI and allow sharing of your ChatGPT plan.
 
-Manage shared usage and credits in ChatGPT through **Manage usage** in T3 Code.
+Manage shared usage and credits in ChatGPT through **Manage usage** in Acid.
 If a request uses a feature that ChatGPT sharing does not support, use another
 provider for that request.
 
-When reconnecting, choose the same account in T3 Code and on OpenAI's sign-in
+When reconnecting, choose the same account in Acid and on OpenAI's sign-in
 page. Disconnecting stops running threads but keeps their history and lets you
 reconnect later.
 
@@ -21,7 +21,7 @@ localhost page into the sign-in panel, even if that page could not load.
 
 ## Use an existing Codex login
 
-T3 Code can use your installed Codex and its existing login. Run `codex login`
+Acid can use your installed Codex and its existing login. Run `codex login`
 on the environment's machine to sign in. [Provider setup](./install.md#providers)
 covers installation and custom configuration.
 
@@ -32,7 +32,7 @@ accounts** on, the default, each new thread starts on the Codex account with the
 most usage left and stays there until that account runs out, and the model
 picker offers Codex once. Turn it off in **Settings → General** to select the
 account from the thread's model picker instead. Compatible accounts can continue the same thread. Connecting
-accounts through T3 Code leaves your CLI login unchanged.
+accounts through Acid leaves your CLI login unchanged.
 
 ### Multiple CLI logins
 
@@ -55,7 +55,7 @@ Then add a second Codex instance in **Settings > Providers**:
 | Codex Work     | `~/.codex`      | Leave empty         |
 | Codex Personal | `~/.codex`      | `~/.codex_personal` |
 
-Both instances must use the same **CODEX_HOME path**. T3 Code prepares the shared
+Both instances must use the same **CODEX_HOME path**. Acid prepares the shared
 state in the shadow directory; do not populate it by copying your whole Codex
 home.
 
@@ -70,7 +70,7 @@ from the other home.
 ## Switch accounts in an existing thread
 
 Turn off **Auto-pick accounts**, then choose the other account from the thread's
-model picker. T3 Code offers compatible
+model picker. Acid offers compatible
 Codex instances that share the thread's **CODEX_HOME path**. Changing accounts does
 not move the conversation into a separate Codex home.
 

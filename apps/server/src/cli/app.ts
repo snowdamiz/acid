@@ -55,7 +55,7 @@ export class DesktopAppUnreachableError extends Schema.TaggedError<DesktopAppUnr
   },
 ) {
   override get message(): string {
-    return "Could not reach the T3 Code desktop app. Start or update the desktop app on this machine, then run `t3 app` again. A running T3 Code server is not enough.";
+    return "Could not reach the Acid desktop app. Start or update the desktop app on this machine, then run `t3 app` again. A running Acid server is not enough.";
   }
 }
 
@@ -69,7 +69,7 @@ export class DesktopAppRequestFailedError extends Schema.TaggedError<DesktopAppR
   },
 ) {
   override get message(): string {
-    return `T3 Code could not open ${this.workspaceRoot} (${this.code}).`;
+    return `Acid could not open ${this.workspaceRoot} (${this.code}).`;
   }
 }
 
@@ -244,7 +244,7 @@ const runAppCommand = Effect.fn("cli.app")(function* (flags: {
     });
   }
 
-  yield* Console.log(`Opened ${workspaceRoot} in T3 Code.`);
+  yield* Console.log(`Opened ${workspaceRoot} in Acid.`);
 });
 
 export const appCommand = Command.make("app", {
@@ -254,6 +254,6 @@ export const appCommand = Command.make("app", {
     Argument.optional,
   ),
 }).pipe(
-  Command.withDescription("Open a project in the running T3 Code desktop app."),
+  Command.withDescription("Open a project in the running Acid desktop app."),
   Command.withHandler(runAppCommand),
 );

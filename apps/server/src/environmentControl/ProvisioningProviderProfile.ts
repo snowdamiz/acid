@@ -125,7 +125,7 @@ export const resolveProvisioningProviderProfile = Effect.fn("resolveProvisioning
           return yield* new ProvisionRefused({
             reason: "credentials",
             message:
-              "This Codex account signs in with ChatGPT through T3 Code, which cloud machines can't use. Pick a Codex account signed in with the Codex CLI.",
+              "This Codex account signs in with ChatGPT through Acid, which cloud machines can't use. Pick a Codex account signed in with the Codex CLI.",
           });
         const layout = yield* resolveCodexHomeLayout(config);
         source = NodePath.join(layout.effectiveHomePath ?? layout.sharedHomePath, "auth.json");

@@ -1,141 +1,76 @@
-# T3 Code
+# Acid
 
-T3 Code is an "agent harness control surface". It enables control of the agents on your machine with a best-in-class mobile app ([iOS](https://apps.apple.com/us/app/t3-code-remote-claude-more/id6787819824), [Android](https://play.google.com/store/apps/details?id=com.t3tools.t3code)), [web app](https://app.t3.codes) and [Electron-based desktop app](https://t3.codes).
+Acid is an "agent harness control surface": one place to drive the coding agents on your machines from the desktop app, the web app, or your phone. It works with the agent subscriptions you already have (Claude Code, Codex, Cursor, Grok Build, OpenCode, Antigravity).
 
-Works with your subscriptions on Claude Code, Codex, Cursor, Grok Build, OpenCode, and Google Antigravity. If they're set up on your computer, T3 Code can control them.
-
-## "Wait, what are you selling me?"
-
-Nothing. We built T3 Code because we wanted the best possible development experience with agents. We were inspired by existing solutions like the Codex desktop app, Conductor, Claude Desktop and Cursor Glass, but none met our bar.
-
-We wanted something performant, remote-ready, and truly open. If we ever go the wrong direction, we want you to have everything you need to fork and build the editor that you want.
-
-## Installation
+Acid is a fork of [andrewcai8/t3code](https://github.com/andrewcai8/t3code), which is itself a fork of [pingdotgg/t3code](https://github.com/pingdotgg/t3code). On top of upstream it adds cloud provisioning: a chat can create its own machine on E2B, Modal or Namespace, with forks, backups, warm bases, `t3 fork-exec`, a client-side load balancer across hosts, and storage cleanup.
 
 > [!WARNING]
-> T3 Code currently supports Codex, Claude, Cursor, Grok Build, OpenCode, and Antigravity. Install and authenticate at least one provider before use:
->
-> - Codex: install [Codex CLI](https://developers.openai.com/codex/cli) and run `codex login`
-> - Claude: install [Claude Code](https://claude.com/product/claude-code) and run `claude auth login`
-> - Cursor: install [Cursor CLI](https://cursor.com/cli) and run `agent login`
-> - Grok Build: install [Grok Build CLI](https://x.ai/cli) and run `grok login`
-> - OpenCode: install [OpenCode](https://opencode.ai) and run `opencode auth login`
-> - Antigravity: enable it in Settings, then use **Install Antigravity** and **Sign in with Google**. No CLI is required.
+> Never run upstream's `t3 update` or `t3 service install` on an Acid host, and never install the upstream T3 Code desktop app over Acid. They replace this fork with pingdotgg's build. Hosts run this fork's runtime artifact (`runtime-linux-amd64.tar.gz` from this repo's releases, or one built locally).
 
-### Command line
+The internal names are kept so upstream keeps merging cleanly: the CLI is still `t3`, data still lives in `~/.t3`, packages are still `@t3tools/*`, and environment variables still start with `T3CODE_`.
 
-```bash
-curl -fsSL https://t3.codes/install.sh | sh
-```
+## Providers
 
-On Windows, in PowerShell:
+Install and sign in to at least one provider on each host:
 
-```powershell
-irm https://t3.codes/install.ps1 | iex
-```
+- Claude: install [Claude Code](https://claude.com/product/claude-code) and run `claude auth login`
+- Codex: install [Codex CLI](https://developers.openai.com/codex/cli) and run `codex login`
+- Cursor: install [Cursor CLI](https://cursor.com/cli) and run `agent login`
+- Grok Build: install [Grok Build CLI](https://x.ai/cli) and run `grok login`
+- OpenCode: install [OpenCode](https://opencode.ai) and run `opencode auth login`
+- Antigravity: enable it in Settings, then use **Install Antigravity** and **Sign in with Google**
 
-Then run `t3` to start the server and open the local web app. `t3 service install` keeps it running in the background, `t3 update` moves to a newer release, and `t3 --help` has the full reference.
+## Building from source
 
-To try it once without installing, run `npx t3@latest` instead.
-
-### Desktop app
-
-Install the latest version of the desktop app from [GitHub Releases](https://github.com/pingdotgg/t3code/releases), or from your favorite package registry:
-
-#### Windows (`winget`)
-
-```bash
-winget install T3Tools.T3Code
-```
-
-#### Windows (`scoop`)
-
-```bash
-scoop install extras/t3code
-```
-
-#### macOS (Homebrew)
-
-```bash
-brew install --cask t3-code
-```
-
-#### Debian, Ubuntu (`.deb`)
-
-Download the `.deb` from [GitHub Releases](https://github.com/pingdotgg/t3code/releases), then:
-
-```bash
-sudo apt install ./T3-Code-*.deb
-```
-
-#### Arch Linux (AUR)
-
-Stable:
-
-```bash
-yay -S t3code-bin
-```
-
-Nightly:
-
-```bash
-yay -S t3code-nightly-bin
-```
-
-The AUR packaging is maintained in this repository under [`packaging/aur`](./packaging/aur).
-
-## Some notes
-
-We are very very early in this project. Expect bugs.
-
-We are (mostly) not accepting contributions yet. Small fixes may be considered. Big features will not be.
-
-## Documentation
-
-Full docs live in [docs/](./docs). There's no docs site yet.
-
-- [Install and first run](./docs/user/install.md)
-- [Permission modes](./docs/user/permission-modes.md)
-- [Keyboard shortcuts](./docs/user/keybindings.md)
-- [Project settings](./docs/user/project-settings.md)
-- [Appearance preferences](./docs/user/appearance.md)
-- [Remote access from a phone or another machine](./docs/user/remote-access.md)
-- [Connect Claude Code, Codex, ChatGPT and other agents over MCP](./docs/user/outside-agents.md)
-- [Keeping app and server in sync](./docs/user/updating.md)
-- [Source control integrations](./docs/user/source-control.md)
-- Multiple accounts: [Codex](./docs/user/providers-codex.md) · [Claude](./docs/user/providers-claude.md)
-- [Run T3 Code as a background service](./docs/user/background-service.md)
-
-Building from source? Start at [docs/internals/overview.md](./docs/internals/overview.md).
-
-## If you REALLY want to contribute still.... read this first
-
-### Install `vp`
-
-T3 Code uses Vite+ so you'll need to install the global `vp` command-line tool.
-
-#### macOS / Linux
+Acid uses [Vite+](https://viteplus.dev/guide/). Install the global `vp` command, then the dependencies (Node 26.12.1, pinned in `package.json`):
 
 ```bash
 curl -fsSL https://vite.plus | bash
 ```
 
-#### Windows
-
-```bash
-irm https://vite.plus/ps1 | iex
-```
-
-Checkout their getting started guide for more information: https://viteplus.dev/guide/
-
-### Install dependencies
-
 ```bash
 vp i
 ```
 
-Read [CONTRIBUTING.md](./CONTRIBUTING.md) before reporting a bug or opening a PR.
+Run the server and web app in development:
 
-Have a feature request? Start an [Ideas discussion](https://github.com/pingdotgg/t3code/discussions/categories/ideas).
+```bash
+vp run dev
+```
 
-Need support? Join the [Discord](https://discord.gg/jn4EGJjrvv).
+Build the host runtime artifact (what hosts install):
+
+```bash
+vp run build:t3-runtime-artifact
+```
+
+Build the macOS desktop app:
+
+```bash
+vp run dist:desktop:dmg:arm64
+```
+
+## Releases
+
+- **Runtime artifacts:** pushing a `runtime-v*` tag (or running the _Runtime artifact_ workflow) publishes `runtime-linux-amd64.tar.gz` and `runtime-lockfile.tar.gz` with their sha256 sums.
+- **pstack skills:** the _pstack skills_ workflow republishes [chhoumann/t3-pstack](https://github.com/chhoumann/t3-pstack) daily as the `pstack-skills` release that hosts pull through `provisioning.skills[].url`.
+- **Upstream:** the _Sync upstream_ workflow opens a daily pull request merging `andrewcai8/t3code`. Merge it with a merge commit, never a squash.
+
+GitHub disables Actions on new forks: enable them under the repository's **Actions** tab before these workflows run.
+
+## Documentation
+
+Docs live in [docs/](./docs).
+
+- [Install and first run](./docs/user/install.md)
+- [Remote access from a phone or another machine](./docs/user/remote-access.md)
+- [Run as a background service](./docs/user/background-service.md)
+- [Multiple Claude accounts](./docs/user/providers-claude.md)
+- [Connect outside agents over MCP](./docs/user/outside-agents.md)
+- [Internals overview](./docs/internals/overview.md)
+
+Read [CONTRIBUTING.md](./CONTRIBUTING.md) before opening a pull request. Land pull requests with `gh pr merge --merge`.
+
+## License
+
+MIT. See [LICENSE](./LICENSE). Acid keeps the upstream copyright notice.

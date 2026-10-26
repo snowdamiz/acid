@@ -35,7 +35,7 @@ you quit. When the app is not running, Home can only act on this machine.
 ## Instructions and fresh starts
 
 **Settings → Home → Instructions** opens Home's `AGENTS.md`. Add standing
-instructions below T3 Code's section. Home can also keep notes in its folder.
+instructions below Acid's section. Home can also keep notes in its folder.
 
 **Start fresh** gives Home a new thread with the same model. The old thread
 stays in your history, and its notes and instructions carry over.

@@ -152,7 +152,7 @@ it.layer(NodeServices.layer)("selected provisioning account", (it) => {
         },
       });
       expect((yield* Effect.flip(resolve(settings))).message).toBe(
-        "This Codex account signs in with ChatGPT through T3 Code, which cloud machines can't use. Pick a Codex account signed in with the Codex CLI.",
+        "This Codex account signs in with ChatGPT through Acid, which cloud machines can't use. Pick a Codex account signed in with the Codex CLI.",
       );
     }),
   );

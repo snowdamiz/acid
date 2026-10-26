@@ -10,7 +10,7 @@ import { preparePairingRegistration } from "./onboarding.ts";
 const CLIENT_PRESENTATION_LAYER = Layer.succeed(
   ClientCapabilities.ClientPresentation,
   ClientCapabilities.ClientPresentation.of({
-    metadata: { label: "T3 Code Test", deviceType: "desktop", os: "Test OS" },
+    metadata: { label: "Acid Test", deviceType: "desktop", os: "Test OS" },
   }),
 );
 

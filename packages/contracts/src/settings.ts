@@ -1245,7 +1245,7 @@ export const ServerSettings = Schema.Struct({
    */
   autoPickProviderAccounts: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(true))),
   /**
-   * What T3 Code sends when it continues a turn on its own: after a restart, at a usage-limit
+   * What Acid sends when it continues a turn on its own: after a restart, at a usage-limit
    * reset, or on another account. It stays the message's first word, so a skill invocation such as
    * `/review` still reads as one.
    */

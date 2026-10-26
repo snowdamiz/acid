@@ -887,7 +887,7 @@ it.effect("outputs a run already placed on this host are never placed again", ()
     const outcome = yield* forks.attach("job-a", { stdout: 0, stderr: 0 }, rejoined);
     expect(outcome).toMatchObject({ _tag: "Exited", exitCode: 0 });
     expect(sent.stderr).toBe(
-      "[t3] The outputs were not copied back: T3 Code restarted while the outputs were coming back, so they were not copied again.\n",
+      "[t3] The outputs were not copied back: Acid restarted while the outputs were coming back, so they were not copied again.\n",
     );
     expect(NodeFS.existsSync(output)).toBe(false);
   }).pipe(Effect.scoped, Effect.provide(layer));
@@ -1045,14 +1045,14 @@ it.effect("a record whose sandbox is gone fails its job, and a queued job fails 
     const forks = yield* start;
     expect(yield* forks.attach("job-gone", { stdout: 0, stderr: 0 }, () => {})).toEqual({
       _tag: "Lost",
-      message: "Its Modal sandbox ended while T3 Code restarted.",
+      message: "Its Modal sandbox ended while Acid restarted.",
     });
     expect(yield* forks.status(owner, { batchId: "batch-1", waitSeconds: 45 })).toEqual({
       batchId: "batch-1",
       state: "finished",
       jobs: [
-        { index: 0, state: "failed", message: "Its Modal sandbox ended while T3 Code restarted." },
-        { index: 1, state: "failed", message: "T3 Code restarted before this job's copy started." },
+        { index: 0, state: "failed", message: "Its Modal sandbox ended while Acid restarted." },
+        { index: 1, state: "failed", message: "Acid restarted before this job's copy started." },
       ],
     });
     expect(NodeFS.readdirSync(jobsRoot(stateDir))).toEqual([]);

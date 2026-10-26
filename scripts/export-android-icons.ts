@@ -19,8 +19,9 @@ type IconVariant = "dev" | "nightly" | "prod";
 
 const ADAPTIVE_CANVAS = 432;
 const SPLASH_CANVAS = 1152;
-const TEXT = { x: 15.53, y: 37, width: 94.5, height: 57 };
-const WORDMARK_FRACTION = 0.48;
+const TEXT = { x: 37, y: 24, width: 54, height: 79 };
+// The drop is taller than wide, so its height sets the scale.
+const WORDMARK_FRACTION = 0.46;
 const COMPOSER_CANVAS_PT = 1024;
 const SVG_DENSITY = 300;
 const OUTPUT_DIRECTORY = "apps/mobile/assets";
@@ -32,7 +33,7 @@ export class AndroidIconRenderError extends Schema.TaggedError<AndroidIconRender
 ) {}
 
 const wordmarkTransform = (size: number) => {
-  const scale = (size * WORDMARK_FRACTION) / TEXT.width;
+  const scale = (size * WORDMARK_FRACTION) / TEXT.height;
   const tx = (size - TEXT.width * scale) / 2 - TEXT.x * scale;
   const ty = (size - TEXT.height * scale) / 2 - TEXT.y * scale;
   return `translate(${tx.toFixed(3)} ${ty.toFixed(3)}) scale(${scale.toFixed(4)})`;
