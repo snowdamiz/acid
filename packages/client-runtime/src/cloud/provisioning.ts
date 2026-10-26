@@ -62,12 +62,15 @@ export function runsLocalAgents(
 /** Where an environment can run a scheduled task, its default first. */
 export function offeredScheduledTaskTargets(
   config:
-    | Pick<ServerConfig, "environmentControl" | "provisionProviders" | "localAgentRuns">
+    | Pick<
+        ServerConfig,
+        "environmentControl" | "provisionProviders" | "localAgentRuns" | "localAutomationRuns"
+      >
     | null
     | undefined,
 ): readonly [ScheduledTaskTarget, ...ReadonlyArray<ScheduledTaskTarget>] {
   return scheduledTaskTargets({
-    localAgentRuns: runsLocalAgents(config),
+    localAgentRuns: runsLocalAgents(config) || config?.localAutomationRuns === true,
     provisionProviders: offeredProvisionProviders(config),
   });
 }

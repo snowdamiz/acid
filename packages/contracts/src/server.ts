@@ -641,6 +641,11 @@ export const ServerConfig = Schema.Struct({
    */
   localAgentRuns: Schema.optionalKey(Schema.Boolean),
   /**
+   * True on such a host when scheduled and webhook tasks may still run here, so clients offer it
+   * as a place to run a task, never a chat.
+   */
+  localAutomationRuns: Schema.optionalKey(Schema.Boolean),
+  /**
    * What a chat on this host will find in its provisioned environment. Set
    * only when `localAgentRuns` is false, where the host's own providers
    * cannot see these skills.

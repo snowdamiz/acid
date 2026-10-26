@@ -360,6 +360,17 @@ describe("offeredScheduledTaskTargets", () => {
     ).toEqual(["e2b", "modal"]);
   });
 
+  it("offers this server first again on a host that runs only automations", () => {
+    expect(
+      offeredScheduledTaskTargets({
+        environmentControl: true,
+        localAgentRuns: false,
+        localAutomationRuns: true,
+        provisionProviders: ["e2b", "namespace"],
+      }),
+    ).toEqual(["local", "e2b", "namespace"]);
+  });
+
   it("keeps this server on a host that runs no agents and has no cloud machine", () => {
     expect(
       offeredScheduledTaskTargets({

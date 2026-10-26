@@ -1746,7 +1746,11 @@ export const layerWsRpc = (
           auth,
           cwd: config.cwd,
           keybindingsConfigPath: config.keybindingsConfigPath,
-          ...(yield* environmentControlServerConfig(environmentControl, config.localAgentRuns)),
+          ...(yield* environmentControlServerConfig(
+            environmentControl,
+            config.localAgentRuns,
+            config.localAutomationRuns === true,
+          )),
           keybindings: keybindingsConfig.keybindings,
           issues: keybindingsConfig.issues,
           providers,
