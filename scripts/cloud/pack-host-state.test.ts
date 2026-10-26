@@ -64,6 +64,7 @@ const fixture = async (
           },
         },
         egressAllow: ["registry.npmjs.org"],
+        e2bTimeoutMinutes: 60,
         namespace: { size: "m" },
         modal: { imageId: "im-fixture", environment: "t3-sandboxes" },
         repositories: [
@@ -190,6 +191,7 @@ describe("packHostState", () => {
         provisioning: {
           templateId: "t3-common",
           egressAllow: ["registry.npmjs.org"],
+          e2bTimeoutMinutes: 60,
           shellEnvironment: [{ name: "GH_TOKEN", source: "/data/t3/shell-environment/GH_TOKEN" }],
           skills: [{ source: "/data/t3/skills/0/review-skills", name: "review" }],
           repositories: [
@@ -212,6 +214,7 @@ describe("packHostState", () => {
         provisioning: {
           templateId: "t3-common",
           egressAllow: ["registry.npmjs.org"],
+          e2bTimeoutMinutes: 60,
           shellEnvironment: [{ name: "GH_TOKEN", source: "/data/t3/shell-environment/GH_TOKEN" }],
           skills: [{ source: "/data/t3/skills/0/review-skills", name: "review" }],
           namespace: { size: "m" },
@@ -263,6 +266,7 @@ describe("packHostState", () => {
         provisioning: {
           templateId: "t3-common",
           egressAllow: ["registry.npmjs.org"],
+          e2bTimeoutMinutes: 60,
           shellEnvironment: [{ name: "GH_TOKEN", source: "/data/t3/shell-environment/GH_TOKEN" }],
           skills: [{ source: "/data/t3/skills/0/review-skills", name: "review" }],
           namespace: { size: "m" },

@@ -43,6 +43,7 @@ export interface HostConfig {
       readonly namespace?: unknown;
     }>;
     readonly egressAllow?: unknown;
+    readonly e2bTimeoutMinutes?: number;
     readonly homeFiles?: ReadonlyArray<ConfiguredFile>;
     readonly workspaceFiles?: ReadonlyArray<ConfiguredFile>;
     readonly skills?: ReadonlyArray<{
@@ -308,6 +309,10 @@ export async function packHostState(input: PackInput): Promise<HostState> {
         // provisioned environments without the allowlist their preparation needs,
         // which fails far from here as an unreachable package host.
         ...(provisioning?.egressAllow ? { egressAllow: provisioning.egressAllow } : {}),
+        // A plan that caps sandbox timeouts refuses the six-hour default, so the cap travels too.
+        ...(provisioning?.e2bTimeoutMinutes
+          ? { e2bTimeoutMinutes: provisioning.e2bTimeoutMinutes }
+          : {}),
         // The host's `shellEnvironment` names source paths on the host, and
         // freezing a manifest reads every one of them, so the entries the manager
         // gets point at copies it owns. Carrying the host's paths verbatim made
