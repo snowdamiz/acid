@@ -3227,7 +3227,7 @@ const layerCloudWsRpc = (currentSession: EnvironmentAuth.AuthenticatedSession) =
               ? fleetBroker.connect(input)
               : Effect.fail(
                   new HomeUnavailableError({
-                    message: "Home runs only on a server the T3 Code desktop app hosts.",
+                    message: "Home runs only on a server the Acid desktop app hosts.",
                   }),
                 ),
           ),

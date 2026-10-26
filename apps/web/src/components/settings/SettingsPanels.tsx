@@ -1027,7 +1027,7 @@ export function GeneralSettingsPanel() {
         <SettingsRow
           serverScoped
           {...searchableSetting("continuation-prompt")}
-          description="Sent when T3 Code continues a turn on its own, after a restart or a usage limit. Start it with a skill, such as /review, to run that skill on every continuation."
+          description="Sent when Acid continues a turn on its own, after a restart or a usage limit. Start it with a skill, such as /review, to run that skill on every continuation."
           settingKeys={["continuationPrompt"]}
           resetAction={
             settings.continuationPrompt !== DEFAULT_UNIFIED_SETTINGS.continuationPrompt ? (
@@ -2012,7 +2012,7 @@ export function GeneralSettingsPanel() {
         <MobileAppSettingsRow />
         <SettingsRow
           {...searchableSetting("privacy-policy")}
-          description="How we handle your data, including the anonymous usage data T3 Code collects."
+          description="How we handle your data, including the anonymous usage data Acid collects."
           control={
             <Button
               render={<a href={PRIVACY_POLICY_URL} target="_blank" rel="noreferrer noopener" />}
@@ -2046,7 +2046,7 @@ export function GeneralSettingsPanel() {
         />
         <SettingsRow
           {...searchableSetting("open-source-licenses")}
-          description="Notices for dependencies, assets, and optional tools used by T3 Code."
+          description="Notices for dependencies, assets, and optional tools used by Acid."
           control={
             <Button
               render={<Link to="/settings/open-source-licenses" />}

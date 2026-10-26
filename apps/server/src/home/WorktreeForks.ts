@@ -642,7 +642,7 @@ export const make = Effect.fn("WorktreeForks.make")(function* (
       yield* Effect.sync(() => NodeFS.rmSync(local, { force: true }));
       return {
         outputsProblem:
-          "T3 Code restarted while the outputs were coming back, so they were not copied again.",
+          "Acid restarted while the outputs were coming back, so they were not copied again.",
       };
     }
     const unpacked = yield* Effect.sync(() =>
@@ -1185,7 +1185,7 @@ export const make = Effect.fn("WorktreeForks.make")(function* (
     );
   });
 
-  const goneMessage = "Its Modal sandbox ended while T3 Code restarted.";
+  const goneMessage = "Its Modal sandbox ended while Acid restarted.";
 
   /**
    * Adopts a `t3 fork-exec` job and keeps it for its caller to re-attach. A caller that does not
@@ -1352,9 +1352,7 @@ export const make = Effect.fn("WorktreeForks.make")(function* (
           index: job.index,
           state: "failed",
           message:
-            job.state === "queued"
-              ? "T3 Code restarted before this job's copy started."
-              : goneMessage,
+            job.state === "queued" ? "Acid restarted before this job's copy started." : goneMessage,
         };
       }
       yield* saveBatch(batch);

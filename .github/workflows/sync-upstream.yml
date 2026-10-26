@@ -10,10 +10,11 @@ permissions:
   pull-requests: write
 
 # main is protected, so upstream arrives as a pull request merged with a merge
-# commit, never a squash: later syncs then share history with pingdotgg/t3code.
+# commit, never a squash: later syncs then share history with andrewcai8/t3code,
+# which itself merges pingdotgg/t3code daily.
 jobs:
   sync:
-    name: Open a pull request merging pingdotgg/t3code
+    name: Open a pull request merging andrewcai8/t3code
     runs-on: ubuntu-24.04
     env:
       # Pull requests opened with the default token start no CI, so required
@@ -35,7 +36,7 @@ jobs:
           set -eu
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git remote add upstream https://github.com/pingdotgg/t3code.git
+          git remote add upstream https://github.com/andrewcai8/t3code.git
           git fetch --no-tags upstream main
           behind=$(git rev-list --count "HEAD..upstream/main")
           if [ "$behind" -eq 0 ]; then
@@ -61,8 +62,8 @@ jobs:
             git commit -qam "ci: run upstream's Blacksmith jobs on GitHub's runner, as the fork has none"
           fi
           git push --force origin "$HEAD_BRANCH"
-          title="chore: merge upstream pingdotgg/t3code"
-          body="Merges ${behind} upstream commits through pingdotgg/t3code@${upstream}. Merge with **Create a merge commit**, never squash."
+          title="chore: merge upstream andrewcai8/t3code"
+          body="Merges ${behind} upstream commits through andrewcai8/t3code@${upstream}. Merge with **Create a merge commit**, never squash."
           number=$(gh pr list --head "$HEAD_BRANCH" --base "$BASE" --state open --json number --jq 'first | .number // empty')
           if [ -n "$number" ]; then
             gh pr edit "$number" --body "$body"

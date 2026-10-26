@@ -127,7 +127,7 @@ const make = Effect.gen(function* () {
   const fail = (message: string) => new HomeUnavailableError({ message });
   const requireAvailable = available
     ? Effect.void
-    : Effect.fail(fail("Home runs only on a server the T3 Code desktop app hosts."));
+    : Effect.fail(fail("Home runs only on a server the Acid desktop app hosts."));
 
   const readHome = settings.getSettings.pipe(
     Effect.map((current) => current.home),

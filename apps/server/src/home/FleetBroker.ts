@@ -189,9 +189,7 @@ const make = Effect.gen(function* () {
         if (host === null) {
           return Effect.succeed([
             Option.some(
-              unavailable(
-                "No desktop window is relaying Home's calls. Open the T3 Code desktop app.",
-              ),
+              unavailable("No desktop window is relaying Home's calls. Open the Acid desktop app."),
             ),
             current,
           ] as const);

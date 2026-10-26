@@ -249,7 +249,7 @@ Deleting a chat's cloud machine puts it to sleep instead of destroying it. For 3
 **Restore** on the chat or under **Settings → Connections** to bring it back. After that the host
 deletes it for good.
 
-While you use T3 Code on any device, the machines of cloud chats that are not settled wake ahead of
+While you use Acid on any device, the machines of cloud chats that are not settled wake ahead of
 you and stay awake, so opening one takes seconds. Settled chats stay asleep until you open them.
 The sidebar says when a chat's machine is asleep, waking, or updating.
 
@@ -257,7 +257,7 @@ The sidebar says when a chat's machine is asleep, waking, or updating.
 
 Select the project and open Project to choose an icon, emoji, monogram, or image. The choice applies to
 every checkout in the project group and appears on connected clients. Choose **Automatic** to let
-T3 Code detect an icon again.
+Acid detect an icon again.
 
 Choose **Monogram** in the icon picker to set one or two letters or numbers and a color.
 
@@ -271,6 +271,6 @@ In Source Control, enable **Automatically pull** to keep the default-branch chec
 with its configured upstream. Choose an environment to set the default or a project to override it.
 On mobile, use **Settings → Source control** to change selected environment defaults or project overrides.
 
-T3 Code only pulls when it can fast-forward and the checkout has no changed files, untracked files,
+Acid only pulls when it can fast-forward and the checkout has no changed files, untracked files,
 or local commits. It skips checkouts on another branch or without an upstream. If a checkout has
 local work, resolve it yourself before automatic pulls can resume.

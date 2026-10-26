@@ -430,14 +430,14 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
           className="me-1 text-2xs text-muted-foreground/70"
           data-user-message-attribution="home-report"
         >
-          Watch report from T3 Code
+          Watch report from Acid
         </p>
       ) : userMessage.attribution === "t3code" ? (
         <p
           className="me-1 text-2xs text-muted-foreground/70"
           data-user-message-attribution="t3code"
         >
-          Sent by T3 Code
+          Sent by Acid
         </p>
       ) : null}
       {row.message.inputIntent === "steer" ||

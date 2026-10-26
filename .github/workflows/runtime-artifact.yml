@@ -16,7 +16,7 @@ permissions:
 jobs:
   publish:
     name: Publish runtime artifacts
-    if: github.repository == 'andrewcai8/t3code'
+    if: github.repository == 'snowdamiz/acid'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:

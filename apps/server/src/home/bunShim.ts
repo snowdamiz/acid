@@ -34,7 +34,7 @@ export interface BunShimSettings {
 const script = (binDir: string, owner: string, settings: BunShimSettings) => `#!/bin/sh
 ${MARKER}
 ${ownerLine(owner)}
-# Written by T3 Code for worktree forks: sends a large \`bun test\` run to \`t3 fork-exec\` and
+# Written by Acid for worktree forks: sends a large \`bun test\` run to \`t3 fork-exec\` and
 # runs everything else with the real bun. T3 removes it, and restores any bun it moved aside to
 # ${REAL}, when worktree forks or this shim are turned off.
 shim=${shellQuote(NodePath.join(binDir, "bun"))}

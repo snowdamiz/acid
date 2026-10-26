@@ -224,8 +224,8 @@ it("exits 70 when its job cannot be rejoined: an older server, or none in time",
     }
     expect(cli.stderr.at(-1)).toBe(
       comesBack
-        ? "[t3] Could not rejoin job job-1: this T3 Code cannot rejoin jobs (The request was malformed.).\n"
-        : "[t3] Could not rejoin job job-1: T3 Code did not answer in time.\n",
+        ? "[t3] Could not rejoin job job-1: this Acid cannot rejoin jobs (The request was malformed.).\n"
+        : "[t3] Could not rejoin job job-1: Acid did not answer in time.\n",
     );
     vi.restoreAllMocks();
   }
