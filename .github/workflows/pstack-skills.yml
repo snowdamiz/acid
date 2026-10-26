@@ -6,6 +6,12 @@ on:
   schedule:
     - cron: "41 6 * * *"
   workflow_dispatch:
+  # A merged change to the build republishes at once instead of waiting for the schedule.
+  push:
+    branches: [main]
+    paths:
+      - "scripts/pstack/**"
+      - ".github/workflows/pstack-skills.yml"
   # A pull request that changes the build runs it without publishing.
   pull_request:
     paths:
