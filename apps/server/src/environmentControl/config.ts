@@ -267,6 +267,11 @@ const Provisioning = Schema.Struct({
    * commands, and a chat was created for it. Default 12; `0` disables both.
    */
   warmBaseRefreshHours: Schema.optional(Schema.Number.check(Schema.isGreaterThanOrEqualTo(0))),
+  /**
+   * How long an E2B box runs before it pauses, renewed each time the manager reaches it. E2B
+   * caps this per plan and rejects a longer one (60 on the Hobby plan). Default 360.
+   */
+  e2bTimeoutMinutes: Schema.optional(Schema.Int.check(Schema.isGreaterThan(0))),
   /** Limits on t3_fork_run, which runs a cloud chat's jobs in throwaway copies of its machine. */
   workerForks: Schema.optional(
     Schema.Struct({
@@ -342,6 +347,9 @@ const Provisioning = Schema.Struct({
   ),
 });
 export type Provisioning = typeof Provisioning.Type;
+
+export const e2bTimeoutMs = (provisioning: Provisioning | undefined) =>
+  (provisioning?.e2bTimeoutMinutes ?? 360) * 60_000;
 
 export const EnvironmentControlConfig = Schema.Struct({
   e2bApiKey: TrimmedNonEmptyString,

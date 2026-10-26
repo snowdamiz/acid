@@ -126,6 +126,7 @@ import {
 } from "./accountSwitch.ts";
 import * as ServerConfig from "../config.ts";
 import {
+  e2bTimeoutMs,
   readConfig,
   resolveControlConfigPath,
   type EnvironmentControlConfig,
@@ -173,6 +174,16 @@ import {
 import { BoxUsageStore } from "../usage/boxUsage.ts";
 
 const isProvisionRequestId = Schema.is(ProvisionRequestId);
+
+const e2bRuntime = (
+  config: EnvironmentControlConfig,
+  onResumeRetry?: Parameters<typeof makeE2bProvisionRuntime>[1],
+) =>
+  makeE2bProvisionRuntime(
+    { apiKey: config.e2bApiKey },
+    onResumeRetry,
+    e2bTimeoutMs(config.provisioning),
+  );
 /** How long a lease whose proxy could not be reconnected waits before the gateway tries again. */
 const RECONNECT_RETRY_MS = 30_000;
 
@@ -1704,24 +1715,14 @@ export const layer = Layer.effect(
                   };
                   if (onModal) return onModal.modal.backUp(operation, manifest, input, deadline);
                   return e2b
-                    ? makeE2bProvisionRuntime({ apiKey: config.e2bApiKey }).backUp(
-                        operation,
-                        e2b.sandboxId,
-                        manifest,
-                        input,
-                        deadline,
-                      )
+                    ? e2bRuntime(config).backUp(operation, e2b.sandboxId, manifest, input, deadline)
                     : null;
                 },
               },
               healthCheck: {
                 probe: async (lease) => {
                   const box = await e2bBox(lease);
-                  if (box)
-                    return makeE2bProvisionRuntime({ apiKey: config.e2bApiKey }).probeHealth(
-                      box.operation,
-                      box.sandboxId,
-                    );
+                  if (box) return e2bRuntime(config).probeHealth(box.operation, box.sandboxId);
                   const onModal = await modalChat(lease.sandboxId);
                   return onModal ? onModal.modal.probeHealth(onModal.operation) : null;
                 },
@@ -1732,10 +1733,7 @@ export const layer = Layer.effect(
               rebootBox: async (lease) => {
                 const box = await e2bBox(lease);
                 if (!box) throw new Error("The box is not an E2B box this host provisioned.");
-                await makeE2bProvisionRuntime({ apiKey: config.e2bApiKey }).reboot(
-                  box.operation,
-                  box.sandboxId,
-                );
+                await e2bRuntime(config).reboot(box.operation, box.sandboxId);
               },
               tellChat: async (lease, text) => {
                 const access = lease.remoteAccess;
@@ -1765,7 +1763,7 @@ export const layer = Layer.effect(
                   // An awake sandbox is not a resumed chat until its T3 server answers.
                   // A refused one is still awake, so its lease says so and the reaper
                   // pauses it, rather than leaving it running out E2B's six-hour timeout.
-                  await resumeProvisionedE2b(input.leaseId, config.e2bApiKey).catch(
+                  await resumeProvisionedE2b(input.leaseId, config).catch(
                     async (cause: unknown) => {
                       await leaseRegistry.markActive({ leaseId: input.leaseId });
                       throw cause;
@@ -2033,10 +2031,7 @@ export const layer = Layer.effect(
       const resource = operation.state.allocation.resource;
       const guest =
         resource.provider === "e2b"
-          ? await makeE2bProvisionRuntime({ apiKey: config.e2bApiKey }).guest(
-              operation,
-              resource.sandboxId,
-            )
+          ? await e2bRuntime(config).guest(operation, resource.sandboxId)
           : resource.provider === "modal"
             ? await (await resolveModal()).guest(operation)
             : null;
@@ -2109,15 +2104,18 @@ export const layer = Layer.effect(
         mac: (await resolveNamespace()).mac,
       };
     };
-    const resumeProvisionedE2b = async (requestId: ProvisionRequestId, apiKey: string) => {
+    const resumeProvisionedE2b = async (
+      requestId: ProvisionRequestId,
+      config: EnvironmentControlConfig,
+    ) => {
       const operation = await Effect.runPromise(store.get(requestId));
       if (
         operation.state.kind !== "ready" ||
         operation.state.allocation.resource.provider !== "e2b"
       )
         throw new Error("No ready E2B runtime");
-      const { refreshError, restarted, envdUnprotected } = await makeE2bProvisionRuntime(
-        { apiKey },
+      const { refreshError, restarted, envdUnprotected } = await e2bRuntime(
+        config,
         logE2bResumeRetry,
       ).resume(
         operation,
@@ -2146,17 +2144,16 @@ export const layer = Layer.effect(
         if (!manager) throw new Error("Missing cloud configuration");
         const manifest = await manifests.load(operation.request.requestId);
         const build = await manifests.readRuntime(operation.request.requestId);
-        const connection = { apiKey: manager.config.e2bApiKey };
         return {
           manifest,
           build,
           namespace: operation.request.provider === "namespace" ? await resolveNamespace() : null,
           modal: operation.request.provider === "modal" ? await resolveModal() : null,
-          runtime: makeE2bProvisionRuntime(connection, logE2bResumeRetry),
+          runtime: e2bRuntime(manager.config, logE2bResumeRetry),
           allocator: makeE2bAllocationPorts({
-            connection,
+            connection: { apiKey: manager.config.e2bApiKey },
             parentTimeoutMs: 10 * 60_000,
-            sandboxTimeoutMs: 6 * 3_600_000,
+            sandboxTimeoutMs: e2bTimeoutMs(manager.config.provisioning),
             ...(manifest.egressAllow.length
               ? { network: { allowOut: [...manifest.egressAllow], denyOut: [ALL_TRAFFIC] } }
               : {}),
@@ -2455,7 +2452,7 @@ export const layer = Layer.effect(
       )
         throw new Error("The warm base build is not a ready E2B box.");
       return {
-        runtime: makeE2bProvisionRuntime({ apiKey: manager.config.e2bApiKey }, logE2bResumeRetry),
+        runtime: e2bRuntime(manager.config, logE2bResumeRetry),
         sandboxId: operation.state.allocation.resource.sandboxId,
       };
     };
@@ -2499,9 +2496,7 @@ export const layer = Layer.effect(
         ).warmKey,
       buildSnapshots: async (requestId) => {
         const operation = await runLogged(store.accept((await manifests.load(requestId)).request));
-        const runtime = makeE2bProvisionRuntime({
-          apiKey: (await requireManager()).config.e2bApiKey,
-        });
+        const runtime = e2bRuntime((await requireManager()).config);
         const snapshotIds: string[] = [];
         for (const resource of allocatedResources(operation.state))
           if (resource.provider === "e2b")
@@ -2517,9 +2512,7 @@ export const layer = Layer.effect(
         return runtime.snapshot(operation, sandboxId);
       },
       deleteSnapshot: async (snapshotId) =>
-        makeE2bProvisionRuntime({
-          apiKey: (await requireManager()).config.e2bApiKey,
-        }).deleteSnapshot(snapshotId),
+        e2bRuntime((await requireManager()).config).deleteSnapshot(snapshotId),
     });
     const spareStore = makeWarmBaseStore(stateDir, "spares");
     const spareClaims = makeSpareClaims(stateDir);
@@ -2646,10 +2639,12 @@ export const layer = Layer.effect(
               ? namespace.mac.attach(operation, manifest, recordedProxy, record)
               : namespace.runtime.attach(operation, resource, manifest, recordedProxy, record);
           }
-          return makeE2bProvisionRuntime(
-            { apiKey: manager.config.e2bApiKey },
-            logE2bResumeRetry,
-          ).attach(operation, resource.sandboxId, manifest, record);
+          return e2bRuntime(manager.config, logE2bResumeRetry).attach(
+            operation,
+            resource.sandboxId,
+            manifest,
+            record,
+          );
         },
         touch: async (operation) => {
           const manager = await resolve();
@@ -2662,10 +2657,7 @@ export const layer = Layer.effect(
               ? namespace.mac.touch(operation)
               : namespace.runtime.touch(operation, resource);
           }
-          return makeE2bProvisionRuntime(
-            { apiKey: manager.config.e2bApiKey },
-            logE2bResumeRetry,
-          ).touch(operation, resource.sandboxId);
+          return e2bRuntime(manager.config, logE2bResumeRetry).touch(operation, resource.sandboxId);
         },
         pinnedRuntime: async (provider) => {
           const manager = await resolve();
@@ -3344,10 +3336,7 @@ export const layer = Layer.effect(
                   await (
                     await resolveNamespace()
                   ).runtime.retainImportedLease(current.namespaceResource);
-                else
-                  await makeE2bProvisionRuntime({
-                    apiKey: service.config.e2bApiKey,
-                  }).retainImportedLease(current);
+                else await e2bRuntime(service.config).retainImportedLease(current);
                 return service.touch(input);
               },
               {
