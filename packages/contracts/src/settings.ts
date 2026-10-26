@@ -848,6 +848,23 @@ export const ObservabilitySettings = Schema.Struct({
 });
 export type ObservabilitySettings = typeof ObservabilitySettings.Type;
 
+/**
+ * Cloud machine credentials kept in this host's secret store. Each is used before the same one in
+ * environment-control.json.
+ */
+export const CloudCredentialsSettings = Schema.Struct({
+  /** Starts E2B sandboxes. */
+  e2bApiKey: TrimmedString.pipe(Schema.withDecodingDefault(Effect.succeed("")), secretSetting),
+  /** Given to agents on every cloud machine as `SENTRY_AUTH_TOKEN`, so they can read Sentry issues. */
+  sentryAuthToken: TrimmedString.pipe(
+    Schema.withDecodingDefault(Effect.succeed("")),
+    secretSetting,
+  ),
+  /** Given alongside the token as `SENTRY_ORG`. */
+  sentryOrg: TrimmedString.pipe(Schema.withDecodingDefault(Effect.succeed(""))),
+});
+export type CloudCredentialsSettings = typeof CloudCredentialsSettings.Type;
+
 export const SourceControlWritingStyleMode = Schema.Literals([
   "repo_conventions",
   "conventional_commits",
@@ -1350,6 +1367,12 @@ export const ServerSettings = Schema.Struct({
     Schema.withDecodingDefault(Effect.succeed({})),
   ),
   observability: ObservabilitySettings.pipe(Schema.withDecodingDefault(Effect.succeed({}))),
+  cloudCredentials: CloudCredentialsSettings.pipe(Schema.withDecodingDefault(Effect.succeed({}))),
+  /**
+   * A public HTTPS origin that forwards `/api/hooks/*` to this server, such as a tunnel. Webhook
+   * tasks report their URL on it, before the T3 Connect relay's.
+   */
+  publicWebhookOrigin: TrimmedString.pipe(Schema.withDecodingDefault(Effect.succeed(""))),
   sourceControlHosts: Schema.Record(Schema.String, SourceControlHostSettings).pipe(
     Schema.withDecodingDefault(Effect.succeed({})),
   ),
@@ -1674,6 +1697,15 @@ export const ServerSettingsPatch = Schema.Struct({
       otlpLogsUrl: Schema.optionalKey(TrimmedString),
     }),
   ),
+  /** An empty secret removes it from the secret store. */
+  cloudCredentials: Schema.optionalKey(
+    Schema.Struct({
+      e2bApiKey: Schema.optionalKey(TrimmedString),
+      sentryAuthToken: Schema.optionalKey(TrimmedString),
+      sentryOrg: Schema.optionalKey(TrimmedString),
+    }),
+  ),
+  publicWebhookOrigin: Schema.optionalKey(TrimmedString),
   /**
    * Merges per host: a patched field replaces the saved one, so a client sends a per-server-host
    * map whole, with the redaction marker for each saved secret it keeps. An empty or omitted

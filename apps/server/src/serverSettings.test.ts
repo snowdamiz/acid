@@ -1403,6 +1403,45 @@ it.layer(NodeServices.layer)("server settings", (it) => {
       }).pipe(Effect.provide(layerServerSettingsWithSecrets())),
   );
 
+  it.effect(
+    "keeps cloud credentials in the secret store, tells clients only that each is set, and keeps one another edit leaves out",
+    () =>
+      Effect.gen(function* () {
+        const serverSettings = yield* ServerSettingsModule.ServerSettingsService;
+        const serverConfig = yield* ServerConfig.ServerConfig;
+        const fileSystem = yield* FileSystem.FileSystem;
+
+        const saved = yield* serverSettings.updateSettings({
+          cloudCredentials: {
+            e2bApiKey: "e2b_key",
+            sentryAuthToken: "sntrys_token",
+            sentryOrg: "acme",
+          },
+        });
+        assert.deepEqual(saved.cloudCredentials, {
+          e2bApiKey: "e2b_key",
+          sentryAuthToken: "sntrys_token",
+          sentryOrg: "acme",
+        });
+        const raw = yield* fileSystem.readFileString(serverConfig.settingsPath);
+        const forClient =
+          ServerSettingsModule.redactServerSettingsForClient(saved).cloudCredentials;
+        for (const secret of ["e2b_key", "sntrys_token"]) {
+          assert.notInclude(raw, secret);
+          assert.notInclude(JSON.stringify(forClient), secret);
+        }
+        assert.equal(forClient.sentryOrg, "acme");
+        assert.isAbove(forClient.e2bApiKey.length, 0);
+
+        yield* serverSettings.updateSettings({ cloudCredentials: { sentryAuthToken: "" } });
+        assert.deepEqual((yield* serverSettings.getSettings).cloudCredentials, {
+          e2bApiKey: "e2b_key",
+          sentryAuthToken: "",
+          sentryOrg: "acme",
+        });
+      }).pipe(Effect.provide(layerServerSettingsWithSecrets())),
+  );
+
   it.effect("keeps the retired keys for another load when a token cannot be copied", () => {
     const cause = new ServerSecretStore.SecretStoreReadError({
       resource: "bitbucket-access-token",

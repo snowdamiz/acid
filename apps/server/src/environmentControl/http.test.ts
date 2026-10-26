@@ -90,6 +90,8 @@ it.effect(
           keep: () => Effect.die("Unused in provision HTTP proof"),
           restore: () => Effect.die("Unused in provision HTTP proof"),
           presence: () => Effect.die("Unused in provision HTTP proof"),
+          namespaceAccount: Effect.die("Unused in provision HTTP proof"),
+          namespaceSignIn: Effect.die("Unused in provision HTTP proof"),
           provision: (input) =>
             Effect.sync(() => {
               calls.push({ method: "provision", input });

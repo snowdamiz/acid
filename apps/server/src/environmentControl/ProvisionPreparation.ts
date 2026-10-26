@@ -261,8 +261,8 @@ function configuredWorkspaceFiles(
 }
 
 /**
- * The `shellEnvironment` variables `keep` accepts, read from their sources. A
- * source that cannot be read throws, or goes to `onUnreadable` when given.
+ * The `shellEnvironment` variables `keep` accepts, read from their sources or given
+ * as values. A source that cannot be read throws, or goes to `onUnreadable` when given.
  */
 async function shellVariables(
   provisioning: ProvisioningSettings,
@@ -280,7 +280,10 @@ async function shellVariables(
         message: "A configured environment variable would change the isolated home.",
       });
     if (!keep(variable.name)) continue;
-    const read = NodeFSP.readFile(variable.source, "utf8");
+    const read =
+      "value" in variable
+        ? Promise.resolve(variable.value)
+        : NodeFSP.readFile(variable.source, "utf8");
     const value = onUnreadable
       ? await read.catch(() => {
           onUnreadable(variable.name);

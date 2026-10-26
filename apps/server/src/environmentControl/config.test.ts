@@ -368,3 +368,50 @@ it("accepts an HTTPS skill bundle url and refuses another scheme or a named bund
     await NodeFSP.rm(directory, { recursive: true, force: true });
   }
 });
+
+it("uses the cloud credentials saved in settings before the file's, and gives agents the Sentry ones", async () => {
+  const directory = await NodeFSP.mkdtemp(NodePath.join(NodeOS.tmpdir(), "t3-cloud-config-"));
+  const path = NodePath.join(directory, "config.json");
+  const broker = {
+    sandboxId: "broker",
+    metadata: { owner: "test" },
+    url: "https://controller.invalid",
+    ingressKey: "test-ingress",
+  };
+  const shellEnvironment = [
+    { name: "SENTRY_AUTH_TOKEN", source: "/missing/sentry-token" },
+    { name: "OTHER", source: "/missing/other" },
+  ];
+  const saved = { e2bApiKey: "settings-key", sentryAuthToken: "sntryu_token", sentryOrg: "acme" };
+  try {
+    await NodeFSP.writeFile(
+      path,
+      JSON.stringify({ broker, targets: [], provisioning: { shellEnvironment } }),
+      { mode: 0o600 },
+    );
+    // The file alone has no E2B key; the saved one completes it.
+    await expect(readConfig(path)).rejects.toThrow();
+    const config = await readConfig(path, saved);
+    expect(config.e2bApiKey).toBe("settings-key");
+    expect(config.provisioning?.shellEnvironment).toEqual([
+      { name: "OTHER", source: "/missing/other" },
+      { name: "SENTRY_AUTH_TOKEN", value: "sntryu_token" },
+      { name: "SENTRY_ORG", value: "acme" },
+    ]);
+
+    await NodeFSP.writeFile(
+      path,
+      JSON.stringify({
+        e2bApiKey: "file-key",
+        broker,
+        targets: [],
+        provisioning: { shellEnvironment },
+      }),
+    );
+    const unsaved = await readConfig(path, { e2bApiKey: "", sentryAuthToken: "", sentryOrg: "" });
+    expect(unsaved.e2bApiKey).toBe("file-key");
+    expect(unsaved.provisioning?.shellEnvironment).toEqual(shellEnvironment);
+  } finally {
+    await NodeFSP.rm(directory, { recursive: true, force: true });
+  }
+});

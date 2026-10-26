@@ -99,6 +99,7 @@ const LEGACY_DELIVERY_OUTCOMES: ReadonlySet<string> = new Set([
 ]);
 
 interface WebhookOrigin {
+  /** Where webhook URLs are rooted: the public origin set in settings, else the T3 Connect relay. */
   readonly relayHookBaseUrl: string | null;
 }
 
@@ -114,6 +115,26 @@ export function relayHookBaseUrl(input: {
     return null;
   }
   return `${relayUrl}/v1/hooks/${endpointKey}`;
+}
+
+/**
+ * The hooks route on a public HTTPS origin that forwards it to this server, such as a tunnel, or
+ * null for anything other than a bare origin.
+ */
+export function publicHookBaseUrl(origin: string): string | null {
+  const url = URL.parse(origin);
+  if (
+    url === null ||
+    url.protocol !== "https:" ||
+    url.username ||
+    url.password ||
+    url.pathname !== "/" ||
+    url.search ||
+    url.hash
+  ) {
+    return null;
+  }
+  return `${url.origin}${WEBHOOK_ROUTE_PREFIX}`;
 }
 
 export class ScheduledTaskWebhookOrigin extends Context.Reference<Effect.Effect<WebhookOrigin>>(

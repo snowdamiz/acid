@@ -1036,6 +1036,14 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: ["add pair backend host code ssh config agent tunnel saved t3 connect"],
   },
   {
+    id: "cloud-accounts",
+    title: "Cloud accounts",
+    to: "/settings/connections",
+    searchTerms: [
+      "e2b namespace sentry api key token sign in devbox mac sandbox webhook public url tunnel",
+    ],
+  },
+  {
     id: "load-balancing",
     title: "Load balancing",
     to: "/settings/connections",

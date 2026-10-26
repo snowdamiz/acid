@@ -67,6 +67,7 @@ import { stackedThreadToast, toastManager } from "../ui/toast";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { Button } from "../ui/button";
 import { EnvironmentMachineIcon } from "../EnvironmentMachineIcon";
+import { CloudAccountsSettings } from "./CloudAccountsSettings";
 import { CloudConnectionsSettings, agentRunningEnvironments } from "./CloudConnectionsSettings";
 import { isRemoteServerUpdate } from "../../cloud/guestServerUpdate";
 import {
@@ -1531,6 +1532,7 @@ export function ConnectionsSettings() {
         environments={environments}
         onSetEnabled={handleSetSavedBackendEnabled}
       />
+      <CloudAccountsSettings environments={environments} />
       {hasCloudPublicConfig() ? (
         <RemoveT3ConnectEnvironmentDialog
           environmentLabel={pendingT3ConnectRemoval?.label ?? null}

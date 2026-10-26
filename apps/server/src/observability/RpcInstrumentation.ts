@@ -228,6 +228,8 @@ const RPC_AGGREGATES = {
   [WS_METHODS.environmentControlKeep]: "environmentControl",
   [WS_METHODS.environmentControlRestore]: "environmentControl",
   [WS_METHODS.environmentControlPresence]: "environmentControl",
+  [WS_METHODS.environmentControlNamespaceAccount]: "environmentControl",
+  [WS_METHODS.environmentControlNamespaceSignIn]: "environmentControl",
   [WS_METHODS.homeEnable]: "home",
   [WS_METHODS.homeDisable]: "home",
   [WS_METHODS.homeStartFresh]: "home",

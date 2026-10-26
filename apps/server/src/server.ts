@@ -145,6 +145,7 @@ import * as HeldHooksWaker from "./relay/HeldHooksWaker.ts";
 import * as McpOAuth from "./auth/McpOAuth.ts";
 import * as McpOAuthHttp from "./auth/mcpOAuthHttp.ts";
 import {
+  publicHookBaseUrl,
   relayHookBaseUrl,
   ScheduledTaskWebhookOrigin,
 } from "./scheduledTasks/ScheduledTaskService.ts";
@@ -497,7 +498,13 @@ const layerScheduledTaskWebhookOrigin = Layer.effect(
   ScheduledTaskWebhookOrigin,
   Effect.gen(function* () {
     const secrets = yield* ServerSecretStore.ServerSecretStore;
+    const settings = yield* ServerSettings.ServerSettingsService;
     return Effect.gen(function* () {
+      const publicBase = yield* settings.getSettings.pipe(
+        Effect.map((current) => publicHookBaseUrl(current.publicWebhookOrigin)),
+        Effect.orElseSucceed(() => null),
+      );
+      if (publicBase !== null) return { relayHookBaseUrl: publicBase };
       const [relayUrl, tunnelConfig] = yield* Effect.all([
         secrets.get(RELAY_URL_SECRET),
         secrets.get(CLOUD_ENDPOINT_RUNTIME_CONFIG),

@@ -1,6 +1,7 @@
 import {
   AuthOrchestrationOperateScope,
   AuthOrchestrationReadScope,
+  AuthSettingsWriteScope,
   WS_METHODS,
 } from "@t3tools/contracts";
 import { describe, expect, it } from "@effect/vitest";
@@ -46,5 +47,14 @@ describe("environment control RPC scopes", () => {
     ]) {
       expect(requiredScopeForRpcMethod(method)).toBe(AuthOrchestrationOperateScope);
     }
+  });
+
+  it("lets read-only clients see the Namespace login but needs settings write to sign in", () => {
+    expect(requiredScopeForRpcMethod(WS_METHODS.environmentControlNamespaceAccount)).toBe(
+      AuthOrchestrationReadScope,
+    );
+    expect(requiredScopeForRpcMethod(WS_METHODS.environmentControlNamespaceSignIn)).toBe(
+      AuthSettingsWriteScope,
+    );
   });
 });

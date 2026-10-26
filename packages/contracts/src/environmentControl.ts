@@ -534,6 +534,27 @@ export const EnvironmentControlPresenceResult = Schema.Struct({
 });
 export type EnvironmentControlPresenceResult = typeof EnvironmentControlPresenceResult.Type;
 
+/**
+ * The Namespace login this host creates Macs with. Namespace offers no API key that can create
+ * Devboxes, so the host signs in through a browser instead. While a sign-in waits for the user it
+ * names the page to approve it on and the code that page shows.
+ */
+export const NamespaceAccount = Schema.Union([
+  Schema.Struct({
+    state: Schema.Literal("signed-in"),
+    tenantId: Schema.optional(Schema.String),
+    expiresAt: Schema.optional(Schema.String),
+  }),
+  Schema.Struct({ state: Schema.Literal("signed-out") }),
+  Schema.Struct({
+    state: Schema.Literal("signing-in"),
+    url: Schema.String,
+    code: Schema.optional(Schema.String),
+  }),
+  Schema.Struct({ state: Schema.Literal("unavailable"), message: Schema.String }),
+]);
+export type NamespaceAccount = typeof NamespaceAccount.Type;
+
 /** Keeps a cloud machine from automatic cleanup, or allows it again. */
 export const EnvironmentProvisionKeepInput = Schema.Struct({
   requestId: ProvisionRequestId,

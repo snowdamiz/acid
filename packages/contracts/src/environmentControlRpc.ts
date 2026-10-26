@@ -39,6 +39,7 @@ import {
   EnvironmentProvisionKeepResult,
   EnvironmentProvisionRestoreInput,
   EnvironmentProvisionRestoreResult,
+  NamespaceAccount,
 } from "./environmentControl.ts";
 
 export const ENVIRONMENT_CONTROL_WS_METHODS = {
@@ -58,6 +59,8 @@ export const ENVIRONMENT_CONTROL_WS_METHODS = {
   environmentControlKeep: "environmentControl.keep",
   environmentControlRestore: "environmentControl.restore",
   environmentControlPresence: "environmentControl.presence",
+  environmentControlNamespaceAccount: "environmentControl.namespaceAccount",
+  environmentControlNamespaceSignIn: "environmentControl.namespaceSignIn",
 } as const;
 
 const EnvironmentControlListRpc = Rpc.make(ENVIRONMENT_CONTROL_WS_METHODS.environmentControlList, {
@@ -202,6 +205,24 @@ const EnvironmentControlPresenceRpc = Rpc.make(
   },
 );
 
+const EnvironmentControlNamespaceAccountRpc = Rpc.make(
+  ENVIRONMENT_CONTROL_WS_METHODS.environmentControlNamespaceAccount,
+  {
+    payload: Schema.Struct({}),
+    success: NamespaceAccount,
+    error: Schema.Union([EnvironmentAuthorizationError, EnvironmentControlError]),
+  },
+);
+/** Starts a browser sign-in, or answers with the one already waiting for the user. */
+const EnvironmentControlNamespaceSignInRpc = Rpc.make(
+  ENVIRONMENT_CONTROL_WS_METHODS.environmentControlNamespaceSignIn,
+  {
+    payload: Schema.Struct({}),
+    success: NamespaceAccount,
+    error: Schema.Union([EnvironmentAuthorizationError, EnvironmentControlError]),
+  },
+);
+
 export const EnvironmentControlRpcs = [
   EnvironmentControlListRpc,
   EnvironmentControlListProvisionedRpc,
@@ -219,4 +240,6 @@ export const EnvironmentControlRpcs = [
   EnvironmentControlKeepRpc,
   EnvironmentControlRestoreRpc,
   EnvironmentControlPresenceRpc,
+  EnvironmentControlNamespaceAccountRpc,
+  EnvironmentControlNamespaceSignInRpc,
 ] as const;

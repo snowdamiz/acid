@@ -2,7 +2,11 @@
 import * as NodeFSP from "node:fs/promises";
 import * as NodeOS from "node:os";
 import * as NodePath from "node:path";
-import { EnvironmentId, TrimmedNonEmptyString } from "@t3tools/contracts";
+import {
+  type CloudCredentialsSettings,
+  EnvironmentId,
+  TrimmedNonEmptyString,
+} from "@t3tools/contracts";
 import * as Schema from "effect/Schema";
 
 export function canonicalRepository(repository: string): string {
@@ -140,10 +144,16 @@ const Provisioning = Schema.Struct({
    *
    * Some agents read their credential from the environment rather than a file,
    * and a sandbox command does not inherit anything the template was built
-   * with, so the value has to be placed where a shell will find it.
+   * with, so the value has to be placed where a shell will find it. Each value is
+   * read from the file at `source` when it is used, or given as `value`.
    */
   shellEnvironment: Schema.optional(
-    Schema.Array(Schema.Struct({ name: TrimmedNonEmptyString, source: TrimmedNonEmptyString })),
+    Schema.Array(
+      Schema.Union([
+        Schema.Struct({ name: TrimmedNonEmptyString, source: TrimmedNonEmptyString }),
+        Schema.Struct({ name: TrimmedNonEmptyString, value: Schema.String }),
+      ]),
+    ),
   ),
   /**
    * Files placed in a new environment's home directory, by path within it.
@@ -368,8 +378,48 @@ export type EnvironmentControlConfig = typeof EnvironmentControlConfig.Type;
 export type ManagedTarget = typeof Target.Type;
 const decodeConfig = Schema.decodeUnknownSync(EnvironmentControlConfig);
 
-export async function readConfig(path: string): Promise<EnvironmentControlConfig> {
-  const config = decodeConfig(JSON.parse(await NodeFSP.readFile(path, "utf8")));
+/**
+ * The Sentry token and organization saved in settings, given to agents on every cloud machine in
+ * place of any the file names.
+ */
+function withSentry(
+  config: EnvironmentControlConfig,
+  saved: CloudCredentialsSettings | undefined,
+): EnvironmentControlConfig {
+  const variables = [
+    ...(saved?.sentryAuthToken
+      ? [{ name: "SENTRY_AUTH_TOKEN", value: saved.sentryAuthToken }]
+      : []),
+    ...(saved?.sentryOrg ? [{ name: "SENTRY_ORG", value: saved.sentryOrg }] : []),
+  ];
+  if (!variables.length || !config.provisioning) return config;
+  const replaced = new Set(variables.map(({ name }) => name));
+  return {
+    ...config,
+    provisioning: {
+      ...config.provisioning,
+      shellEnvironment: [
+        ...(config.provisioning.shellEnvironment ?? []).filter(({ name }) => !replaced.has(name)),
+        ...variables,
+      ],
+    },
+  };
+}
+
+/** The configuration at `path`, with the cloud credentials saved in settings used before its own. */
+export async function readConfig(
+  path: string,
+  saved?: CloudCredentialsSettings,
+): Promise<EnvironmentControlConfig> {
+  const file: unknown = JSON.parse(await NodeFSP.readFile(path, "utf8"));
+  const config = withSentry(
+    decodeConfig(
+      saved?.e2bApiKey && typeof file === "object" && file !== null && !Array.isArray(file)
+        ? { ...file, e2bApiKey: saved.e2bApiKey }
+        : file,
+    ),
+    saved,
+  );
   const url = new URL(config.broker.url);
   if (url.protocol !== "https:" || url.username || url.password || url.search || url.hash)
     throw new Error("Controller requires a private HTTPS endpoint");

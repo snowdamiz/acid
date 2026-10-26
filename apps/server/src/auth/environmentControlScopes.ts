@@ -1,10 +1,14 @@
 import {
   AuthOrchestrationOperateScope,
   AuthOrchestrationReadScope,
+  AuthSettingsWriteScope,
   WS_METHODS,
 } from "@t3tools/contracts";
 
-/** Cloud machine RPCs: reading the list needs read scope, anything that runs or changes one operate. */
+/**
+ * Cloud machine RPCs: reading the list needs read scope, anything that runs or changes one operate.
+ * Signing the host in to Namespace changes the account its Macs bill to, which is a setting.
+ */
 export const ENVIRONMENT_CONTROL_REQUIRED_SCOPES = {
   [WS_METHODS.environmentControlListProvisioned]: AuthOrchestrationReadScope,
   [WS_METHODS.environmentControlList]: AuthOrchestrationReadScope,
@@ -22,4 +26,6 @@ export const ENVIRONMENT_CONTROL_REQUIRED_SCOPES = {
   [WS_METHODS.environmentControlKeep]: AuthOrchestrationOperateScope,
   [WS_METHODS.environmentControlRestore]: AuthOrchestrationOperateScope,
   [WS_METHODS.environmentControlPresence]: AuthOrchestrationOperateScope,
+  [WS_METHODS.environmentControlNamespaceAccount]: AuthOrchestrationReadScope,
+  [WS_METHODS.environmentControlNamespaceSignIn]: AuthSettingsWriteScope,
 } as const;

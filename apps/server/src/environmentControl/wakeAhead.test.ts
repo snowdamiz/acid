@@ -56,12 +56,14 @@ const names = (boxes: ReadonlyArray<DiscoveredProvisionedEnvironment>) =>
 const plan = (
   boxes: ReadonlyArray<DiscoveredProvisionedEnvironment>,
   state: {
+    readonly present?: boolean;
     readonly inFlight?: ReadonlyArray<readonly [string, CloudMachineKind]>;
     readonly retryAt?: ReadonlyArray<readonly [string, number]>;
   } = {},
 ) => {
   const result = planWakeAhead(boxes, {
     now: NOW,
+    present: state.present ?? true,
     inFlight: new Map(
       (state.inFlight ?? []).map(([name, machine]) => [EnvironmentId.make(name), machine]),
     ),
@@ -137,6 +139,109 @@ it("renews awake unsettled chats whose lease ends within ten minutes", () => {
     ]).renew,
   ).toEqual(["ending"]);
 });
+
+/** A pull request the chat opened, with its watch as given; a link without one only shows it. */
+const pullRequest = (
+  input: {
+    readonly watch?: "watching" | "ended";
+    readonly state?: "open" | "merged";
+    readonly source?: "created" | "stack-dismissed";
+  } = {},
+) => {
+  const watch = {
+    startedAt: "2026-10-01T11:00:00.000Z",
+    headSha: null,
+    failedChecks: [],
+    passed: false,
+    passedChecks: [],
+    remarksThrough: "2026-10-01T11:00:00.000Z",
+    remarkIds: [],
+    conflicting: false,
+    wakes: 0,
+  };
+  return {
+    host: "github.com",
+    repository: "acme/app",
+    number: 7,
+    url: "https://github.com/acme/app/pull/7",
+    source: input.source ?? "created",
+    linkedAt: "2026-10-01T11:00:00.000Z",
+    snapshot: input.state
+      ? {
+          state: input.state,
+          title: "Fix the crash",
+          headBranch: "fix/crash",
+          baseBranch: "main",
+          isDraft: false,
+          updatedAt: null,
+          syncedAt: "2026-10-01T11:00:00.000Z",
+        }
+      : null,
+    stack: null,
+    ...(input.watch === "watching" ? { watch } : {}),
+    ...(input.watch === "ended" ? { endedWatch: watch } : {}),
+  };
+};
+
+it("keeps chats watching a pull request awake with nobody here, and only those", () => {
+  const watching = { pullRequests: [pullRequest({ watch: "watching", state: "open" })] };
+  const boxes = [
+    box("watching", { thread: watching }),
+    box("watching-snoozed", { thread: { ...watching, snoozedUntil: "2026-10-01T15:00:00.000Z" } }),
+    box("unsettled", { thread: { pullRequests: [pullRequest()] } }),
+    box("watch-ended", { thread: { pullRequests: [pullRequest({ watch: "ended" })] } }),
+    box("merged", {
+      thread: { pullRequests: [pullRequest({ watch: "watching", state: "merged" })] },
+    }),
+    box("dismissed", {
+      thread: { pullRequests: [pullRequest({ watch: "watching", source: "stack-dismissed" })] },
+    }),
+    box("settled", {
+      thread: { ...watching, settledOverride: "settled", settledAt: "2026-10-01T11:30:00.000Z" },
+    }),
+    box("watching-ending", {
+      lifecycle: "active",
+      expiresAt: "2026-10-01T12:05:00.000Z",
+      thread: watching,
+    }),
+    box("unsettled-ending", { lifecycle: "active", expiresAt: "2026-10-01T12:05:00.000Z" }),
+  ];
+  expect(plan(boxes, { present: false })).toEqual({
+    wake: ["watching", "watching-snoozed"],
+    renew: ["watching-ending"],
+  });
+  expect(plan(boxes).wake).toEqual([
+    "watching",
+    "watching-snoozed",
+    "unsettled",
+    "watch-ended",
+    "merged",
+    "dismissed",
+  ]);
+});
+
+it.effect("wakes a chat watching its pull request though no client ever reports a user", () =>
+  Effect.gen(function* () {
+    yield* TestClock.setTime(NOW);
+    const resumed: Array<string> = [];
+    const wakeAhead = makeWakeAhead({
+      list: Effect.succeed([
+        box("watching", { thread: { pullRequests: [pullRequest({ watch: "watching" })] } }),
+        box("unsettled"),
+      ]),
+      resume: (target) =>
+        Effect.sync(() => {
+          resumed.push(target.environmentId);
+          return { kind: "resumed" } as const;
+        }),
+      renew: () => Effect.void,
+      scope: yield* Effect.scope,
+    });
+    yield* wakeAhead.pass;
+    yield* Effect.yieldNow;
+    expect(resumed).toEqual(["watching"]);
+  }).pipe(Effect.scoped),
+);
 
 it.effect(
   "wakes a present user's two unsettled chats, not the settled one, and reports each machine",
