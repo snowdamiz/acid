@@ -25,6 +25,15 @@ export function createServerCloudAtoms<R, E>(
     execute: (input: EnvironmentRpcInput<typeof WS_METHODS.environmentControlList>) =>
       request(WS_METHODS.environmentControlList, input).pipe(Effect.timeout("20 seconds")),
   });
+  const namespaceAccount = createEnvironmentQueryAtomFamily(runtime, {
+    label: "environment-data:cloud:namespace-account",
+    staleTimeMs: 5_000,
+    // The host asks the Namespace CLI, which may refresh its login first.
+    execute: (input: EnvironmentRpcInput<typeof WS_METHODS.environmentControlNamespaceAccount>) =>
+      request(WS_METHODS.environmentControlNamespaceAccount, input).pipe(
+        Effect.timeout("40 seconds"),
+      ),
+  });
   const provisionedEnvironments = createEnvironmentQueryAtomFamily(runtime, {
     label: "environment-data:cloud:provisioned",
     staleTimeMs: 5_000,
@@ -119,6 +128,16 @@ export function createServerCloudAtoms<R, E>(
     );
   return {
     managedEnvironments,
+    namespaceAccount,
+    signInToNamespace: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:cloud:namespace-sign-in",
+      tag: WS_METHODS.environmentControlNamespaceSignIn,
+      concurrency: { mode: "singleFlight", key: ({ environmentId }) => environmentId },
+      onSettled: (target, registry) =>
+        Effect.sync(() =>
+          registry.refresh(namespaceAccount({ environmentId: target.environmentId, input: {} })),
+        ),
+    }),
     provisionedEnvironments,
     hostBoxLists,
     provisionedBoxes,

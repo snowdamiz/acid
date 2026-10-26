@@ -1,6 +1,7 @@
 import {
   AntigravitySettings,
   ClaudeSettings,
+  CloudCredentialsSettings,
   CodexSettings,
   EasDeviceHostConfig,
   type ServerSettings,
@@ -33,6 +34,7 @@ const providerSecretFields = new Map([
 ]);
 const usageLimitSecretFields = secretSettingsFields(UsageLimitSourceConfig);
 const easDeviceHostSecretFields = secretSettingsFields(EasDeviceHostConfig);
+const cloudCredentialSecretFields = secretSettingsFields(CloudCredentialsSettings);
 const encode = (value: string) => Buffer.from(value, "utf8").toString("base64url");
 
 export interface SettingsSecret {
@@ -155,5 +157,18 @@ export function mapSettingsSecrets(
       ) as EasDeviceHostConfig,
   );
 
-  return { ...settings, providerInstances, sourceControlHosts, usageLimitSources, easDeviceHosts };
+  const cloudCredentials = mapFields(
+    settings.cloudCredentials,
+    cloudCredentialSecretFields,
+    (field) => `cloud-credential-${encode(field)}`,
+  ) as ServerSettings["cloudCredentials"];
+
+  return {
+    ...settings,
+    providerInstances,
+    sourceControlHosts,
+    usageLimitSources,
+    easDeviceHosts,
+    cloudCredentials,
+  };
 }

@@ -16,6 +16,7 @@ import {
   type EnvironmentControlResult,
   type EnvironmentControlPresenceInput,
   type EnvironmentControlPresenceResult,
+  type NamespaceAccount,
   type EnvironmentProvisionAttachInput,
   type EnvironmentProvisionAttachResult,
   type EnvironmentProvisionInput,
@@ -87,6 +88,7 @@ import { boxMachine, listProvisionedEnvironments } from "./ProvisionDiscovery.ts
 import { makeProvisionControl } from "./ProvisionControl.ts";
 import { deliverFirstTurn } from "./firstTurn.ts";
 import { makeNamespaceAllocationPorts } from "./namespaceAllocation.ts";
+import { makeNamespaceLogin } from "./namespaceLogin.ts";
 import {
   makeNamespaceAccountSession,
   makeNamespaceProvisionRuntime,
@@ -1421,6 +1423,10 @@ export class EnvironmentControl extends Context.Service<
     readonly presence: (
       input: EnvironmentControlPresenceInput,
     ) => Effect.Effect<EnvironmentControlPresenceResult, EnvironmentControlError>;
+    /** The Namespace login this host creates Macs with. */
+    readonly namespaceAccount: Effect.Effect<NamespaceAccount, EnvironmentControlError>;
+    /** Starts a browser sign-in to Namespace, or answers with the one waiting for the user. */
+    readonly namespaceSignIn: Effect.Effect<NamespaceAccount, EnvironmentControlError>;
   }
 >()("t3/environmentControl/EnvironmentControl") {}
 
@@ -1507,6 +1513,8 @@ export const layer = Layer.effect(
       | {
           readonly path: string;
           readonly mtimeMs: number;
+          /** The cloud credentials saved in settings that the service was built with. */
+          readonly credentials: string;
           readonly service: Promise<ManagerService | null>;
         }
       | undefined;
@@ -1601,11 +1609,24 @@ export const layer = Layer.effect(
           .then((stats) => stats.mtimeMs)
           .catch(() => null);
         if (mtimeMs === null) return null;
-        if (loaded?.path === path && loaded.mtimeMs === mtimeMs) return loaded.service;
+        // Read per call, so a key saved in settings takes effect like an edit to the file.
+        const saved = await runLogged(
+          settings.getSettings.pipe(
+            Effect.map((current) => current.cloudCredentials),
+            Effect.orElseSucceed(() => undefined),
+          ),
+        );
+        const credentials = JSON.stringify(saved ?? null);
+        if (
+          loaded?.path === path &&
+          loaded.mtimeMs === mtimeMs &&
+          loaded.credentials === credentials
+        )
+          return loaded.service;
         namespace = undefined;
         modal = undefined;
         const service = (async () => {
-          const config = await readConfig(path);
+          const config = await readConfig(path, saved);
           const cloud = createCloudDriver(config, logE2bResumeRetry);
           const control = createEnvironmentControl(
             config.targets,
@@ -1796,12 +1817,19 @@ export const layer = Layer.effect(
           );
           return { ...control, config };
         })();
-        loaded = { path, mtimeMs, service };
+        loaded = { path, mtimeMs, credentials, service };
         return service.catch((error: unknown) => {
           if (loaded?.path === path && loaded.mtimeMs === mtimeMs) loaded = undefined;
           throw error;
         });
       })();
+    const namespaceLogin = makeNamespaceLogin({
+      // Sessions opened under the old login would keep creating Macs on its account.
+      onSignedIn: () => {
+        namespace = undefined;
+      },
+    });
+    yield* Effect.addFinalizer(() => Effect.sync(namespaceLogin.close));
     const resolveNamespace = () => {
       namespace ??= (async () => {
         const manager = await resolve();
@@ -2395,7 +2423,7 @@ export const layer = Layer.effect(
             reason: "credentials",
             message: provisionFailureMessage(
               error,
-              "Log in with nsc login, or set namespaceToken in environment-control.json.",
+              "Sign in to Namespace under Settings → Connections → Cloud accounts, or set namespaceToken in environment-control.json.",
             ),
           });
         }
@@ -3320,6 +3348,16 @@ export const layer = Layer.effect(
         );
       }),
       presence: (input) => wakeAhead.presence(input.present),
+      namespaceAccount: Effect.tryPromise({
+        try: namespaceLogin.status,
+        catch: () =>
+          new EnvironmentControlError({ message: "The Namespace login could not be read." }),
+      }),
+      namespaceSignIn: Effect.tryPromise({
+        try: namespaceLogin.signIn,
+        catch: () =>
+          new EnvironmentControlError({ message: "The Namespace sign-in could not start." }),
+      }),
       touch: (input) =>
         importedLeases.has(input.leaseId)
           ? run<EnvironmentProvisionTouchResult>(

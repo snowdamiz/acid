@@ -22,7 +22,7 @@ const MAX_CONCURRENT_WAKES = 20;
  * opens and template builds. A wake ahead never takes the last one.
  */
 const MAC_SLOTS = 4;
-/** An awake unsettled chat is renewed once its lease ends within this, while the user is here. */
+/** An awake chat kept awake is renewed once its lease ends within this. */
 const RENEW_WITHIN_MS = 10 * 60_000;
 /** How long one report of a present user lasts. Clients report every 4 minutes. */
 const PRESENCE_TTL_MS = 6 * 60_000;
@@ -40,15 +40,43 @@ const unsettledSince = (box: DiscoveredProvisionedEnvironment, now: number): num
 };
 
 /**
- * Which boxes to wake and which to renew while the user is here. Every paused box holding an
- * unsettled chat wakes, the most recently active first, up to the ceiling of wakes in flight,
- * except one refused recently. A Mac wakes one at a time, and only while a slot stays free after
- * it. Awake unsettled boxes whose lease is about to end are renewed.
+ * Whether a box's chat watches one of its pull requests. The watch polls from the box's own server,
+ * so it sees CI and review comments only while the box is awake. It ends on its own once the pull
+ * request merges or closes or the chat settles, snoozed or not.
+ */
+const watchesPullRequest = (box: DiscoveredProvisionedEnvironment): boolean => {
+  const thread = box.chat?.thread;
+  if (
+    !thread ||
+    thread.archivedAt !== null ||
+    thread.settledOverride === "settled" ||
+    thread.settledAt !== null
+  )
+    return false;
+  return (thread.pullRequests ?? []).some(
+    (link) =>
+      link.watch !== undefined &&
+      link.source !== "stack-dismissed" &&
+      link.snapshot?.state !== "merged",
+  );
+};
+
+/** When the chat a box holds last changed, or null when it watches no pull request. */
+const watchingSince = (box: DiscoveredProvisionedEnvironment): number | null =>
+  watchesPullRequest(box) ? DateTime.toEpochMillis(box.chat!.thread.updatedAt) : null;
+
+/**
+ * Which boxes to wake and which to renew. While the user is here, every paused box holding an
+ * unsettled chat wakes; whether or not they are, so does every one whose chat watches a pull
+ * request. The most recently active wake first, up to the ceiling of wakes in flight, except one
+ * refused recently. A Mac wakes one at a time, and only while a slot stays free after it. Awake
+ * boxes kept awake whose lease is about to end are renewed.
  */
 export function planWakeAhead(
   boxes: ReadonlyArray<DiscoveredProvisionedEnvironment>,
   state: {
     readonly now: number;
+    readonly present: boolean;
     readonly inFlight: ReadonlyMap<EnvironmentId, CloudMachineKind>;
     readonly retryAt: ReadonlyMap<string, number>;
   },
@@ -56,9 +84,12 @@ export function planWakeAhead(
   readonly wake: ReadonlyArray<DiscoveredProvisionedEnvironment>;
   readonly renew: ReadonlyArray<DiscoveredProvisionedEnvironment>;
 } {
-  const { now, inFlight, retryAt } = state;
+  const { now, present, inFlight, retryAt } = state;
   const unsettled = boxes
-    .map((box) => ({ box, since: unsettledSince(box, now) }))
+    .map((box) => ({
+      box,
+      since: (present ? unsettledSince(box, now) : null) ?? watchingSince(box),
+    }))
     .filter(
       (entry): entry is { box: DiscoveredProvisionedEnvironment; since: number } =>
         entry.since !== null && !inFlight.has(entry.box.environmentId),
@@ -88,9 +119,10 @@ export function planWakeAhead(
 }
 
 /**
- * Wakes a present user's unsettled cloud chats ahead of them and keeps them awake, and knows
- * which machines are waking or updating right now, whoever asked. Presence lapses on its own a
- * few minutes after the last client reports it, and the reaper then puts the boxes to sleep.
+ * Wakes a present user's unsettled cloud chats ahead of them and keeps them awake, keeps chats
+ * watching a pull request awake whoever is here, and knows which machines are waking or updating
+ * right now, whoever asked. Presence lapses on its own a few minutes after the last client reports
+ * it, and the reaper then puts the boxes no longer kept awake to sleep.
  */
 export function makeWakeAhead(deps: {
   /** Every box the host holds, each with the chat it last read from it. */
@@ -182,7 +214,11 @@ export function makeWakeAhead(deps: {
           state: "asleep" as const,
           machine: box.machine ?? "sandbox",
           provider: box.provider,
-          ...providerFailure(box.environmentId, unsettledSince(box, now) !== null, now),
+          ...providerFailure(
+            box.environmentId,
+            unsettledSince(box, now) !== null || watchesPullRequest(box),
+            now,
+          ),
         })),
     ];
   };
@@ -207,11 +243,12 @@ export function makeWakeAhead(deps: {
     });
   });
 
-  /** One pass over the host's boxes while the user is here; a pass already running is joined. */
+  /** One pass over the host's boxes; a pass already running is joined. */
   const pass = Effect.gen(function* () {
     const now = yield* Clock.currentTimeMillis;
-    if (passing || now >= presentUntil) return;
+    if (passing) return;
     passing = true;
+    const present = now < presentUntil;
     yield* Effect.gen(function* () {
       const boxes = yield* deps.list;
       const inFlight = new Map(
@@ -223,7 +260,7 @@ export function makeWakeAhead(deps: {
       const retryAt = new Map(
         [...failures].map(([leaseId, failure]) => [leaseId, failure.retryAt]),
       );
-      const plan = planWakeAhead(boxes, { now, inFlight, retryAt });
+      const plan = planWakeAhead(boxes, { now, present, inFlight, retryAt });
       for (const box of plan.wake)
         // Started at once so the wake counts as in flight before this pass ends.
         yield* track(
@@ -234,7 +271,9 @@ export function makeWakeAhead(deps: {
       for (const box of plan.renew)
         yield* deps.renew(box).pipe(Effect.ignore, Effect.forkIn(deps.scope));
       if (plan.wake.length > 0 || plan.renew.length > 0)
-        yield* Effect.logInfo("cloud chats kept awake for a present user", {
+        yield* Effect.logInfo("cloud chats kept awake", {
+          present,
+          watchingPullRequests: [...plan.wake, ...plan.renew].filter(watchesPullRequest).length,
           waking: plan.wake.length,
           renewed: plan.renew.length,
           inFlight: inFlight.size,
