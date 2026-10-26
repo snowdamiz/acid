@@ -7,11 +7,16 @@ import type { EnvironmentControl } from "./EnvironmentControl.ts";
 /** What `server.getConfig` tells clients about this host's cloud machines. */
 export const environmentControlServerConfig = Effect.fn(
   "wsHandlers.environmentControlServerConfig",
-)(function* (environmentControl: EnvironmentControl["Service"], localAgentRuns: boolean) {
+)(function* (
+  environmentControl: EnvironmentControl["Service"],
+  localAgentRuns: boolean,
+  localAutomationRuns: boolean,
+) {
   const provisionedSkills = yield* environmentControl.provisionedSkills;
   return {
     environmentControl: true,
     localAgentRuns,
+    ...(!localAgentRuns && localAutomationRuns ? { localAutomationRuns: true } : {}),
     // A config this server cannot read offers nothing rather than failing getConfig.
     provisionProviders: yield* environmentControl.provisionProviders.pipe(
       Effect.orElseSucceed(() => []),

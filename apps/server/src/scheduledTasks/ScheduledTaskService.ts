@@ -45,7 +45,7 @@ import * as Semaphore from "effect/Semaphore";
 import * as Stream from "effect/Stream";
 import * as SqlClient from "effect/sql/SqlClient";
 
-import { localAgentRunsEnabled } from "../orchestration-v2/cloudOnlyHost.ts";
+import { localAutomationRunsEnabled } from "../orchestration-v2/cloudOnlyHost.ts";
 import * as ThreadLaunchService from "../orchestration-v2/ThreadLaunchService.ts";
 import * as ManagedProjectFolders from "../project/ManagedProjectFolders.ts";
 import * as Metrics from "../observability/Metrics.ts";
@@ -441,7 +441,7 @@ export const layer = Layer.effect(
     const scheduler = yield* Scheduler.Scheduler;
     const cloudFire = yield* ScheduledCloudFire;
     const launch = launchFire(cloudFire, threadLaunch);
-    const localAgentRuns = yield* localAgentRunsEnabled;
+    const localTaskRuns = yield* localAutomationRunsEnabled;
     const cloudRuns = yield* FiberSet.make();
     const readWebhookOrigin = yield* ScheduledTaskWebhookOrigin;
     const webhookPermits = yield* Ref.make<ReadonlyMap<ScheduledTaskId, Semaphore.Semaphore>>(
@@ -1169,7 +1169,7 @@ export const layer = Layer.effect(
       // of silently resetting an existing row.
       const existingTask = yield* findTask(id);
       const offeredTargets = scheduledTaskTargets({
-        localAgentRuns,
+        localAgentRuns: localTaskRuns,
         provisionProviders: yield* cloudFire.providers,
       });
       if (input.target === "local" && !offeredTargets.includes("local")) {

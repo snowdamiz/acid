@@ -278,6 +278,10 @@ it.layer(NodeServices.layer)("cli config resolution", (it) => {
 
       expect((yield* resolveWith({})).localAgentRuns).toBe(true);
       expect((yield* resolveWith({ T3CODE_LOCAL_AGENT_RUNS: "false" })).localAgentRuns).toBe(false);
+      expect((yield* resolveWith({})).localAutomationRuns).toBe(false);
+      expect(
+        (yield* resolveWith({ T3CODE_LOCAL_AUTOMATION_RUNS: "true" })).localAutomationRuns,
+      ).toBe(true);
     }),
   );
 
@@ -394,6 +398,7 @@ it.layer(NodeServices.layer)("cli config resolution", (it) => {
         tailscaleServeEnabled: false,
         tailscaleServePort: 443,
         localAgentRuns: true,
+        localAutomationRuns: false,
       });
     }),
   );
@@ -473,6 +478,7 @@ it.layer(NodeServices.layer)("cli config resolution", (it) => {
         tailscaleServeEnabled: false,
         tailscaleServePort: 443,
         localAgentRuns: true,
+        localAutomationRuns: false,
       });
     }),
   );
@@ -708,6 +714,7 @@ it.layer(NodeServices.layer)("cli config resolution", (it) => {
         tailscaleServeEnabled: false,
         tailscaleServePort: 443,
         localAgentRuns: true,
+        localAutomationRuns: false,
       });
     }),
   );

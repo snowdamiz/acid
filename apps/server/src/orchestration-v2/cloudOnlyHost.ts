@@ -14,20 +14,40 @@ export const localAgentRunsEnabled = Effect.serviceOption(ServerConfig.ServerCon
 );
 
 /**
+ * Whether scheduled and webhook tasks may run their agent here: on any host that runs agents, and
+ * on a cloud-only host that allows automations (T3CODE_LOCAL_AUTOMATION_RUNS=true).
+ */
+export const localAutomationRunsEnabled = Effect.serviceOption(ServerConfig.ServerConfig).pipe(
+  Effect.map(
+    Option.match({
+      onNone: () => true,
+      onSome: (config) => config.localAgentRuns || config.localAutomationRuns === true,
+    }),
+  ),
+);
+
+/**
  * A cloud-only host must never start a run here. Clients, scheduled tasks,
  * limit recovery and MCP tools all reach the orchestrator through
  * ThreadManagementService, so it refuses turns and answers with this.
  * ThreadLaunchService checks too, before it creates the thread.
  */
 export const makeLocalRunRefusal = Effect.map(
-  localAgentRunsEnabled,
-  (localAgentRuns) =>
+  Effect.all([localAgentRunsEnabled, localAutomationRunsEnabled]),
+  ([localAgentRuns, localAutomationRuns]) =>
     (command: {
       readonly type: string;
       readonly commandId: OrchestrationV2ServerCommand["commandId"];
+      readonly scheduledTaskId?: unknown;
     }) =>
       !localAgentRuns &&
-      (command.type === "message.dispatch" || command.type === "runtime-request.respond")
+      (command.type === "message.dispatch" || command.type === "runtime-request.respond") &&
+      // A task's own prompt may run where automations do; nothing else starts a run here.
+      !(
+        localAutomationRuns &&
+        command.type === "message.dispatch" &&
+        command.scheduledTaskId !== undefined
+      )
         ? Effect.fail(
             new Orchestrator.OrchestratorCommandRejectedError({
               commandId: command.commandId,

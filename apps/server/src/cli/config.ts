@@ -164,6 +164,9 @@ const EnvServerConfig = Config.all({
     Config.map(Option.getOrUndefined),
   ),
   localAgentRuns: Config.Boolean("T3CODE_LOCAL_AGENT_RUNS").pipe(Config.withDefault(true)),
+  localAutomationRuns: Config.Boolean("T3CODE_LOCAL_AUTOMATION_RUNS").pipe(
+    Config.withDefault(false),
+  ),
 });
 
 const DevAuthTokenConfig = Config.Redacted("T3CODE_DEV_AUTH_TOKEN").pipe(
@@ -495,6 +498,7 @@ export const resolveServerConfig = Effect.fn("config.resolveServerConfig")(funct
     tailscaleServeEnabled,
     tailscaleServePort,
     localAgentRuns: env.localAgentRuns,
+    localAutomationRuns: env.localAutomationRuns,
   };
 
   return config;

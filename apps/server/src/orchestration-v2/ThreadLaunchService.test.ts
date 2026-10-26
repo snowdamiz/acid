@@ -130,16 +130,22 @@ interface HarnessOptions {
   readonly providers?: ReadonlyArray<ServerProvider>;
   readonly git?: Partial<GitWorkflow.GitWorkflowService["Service"]>;
   /** A host started with T3CODE_LOCAL_AGENT_RUNS=false. */
-  readonly cloudOnlyHost?: boolean;
+  /** True refuses every local run; "automations" still runs scheduled and webhook tasks. */
+  readonly cloudOnlyHost?: boolean | "automations";
 }
 
-const layerCloudOnlyHostConfig = Layer.effect(
-  ServerConfig.ServerConfig,
-  Effect.map(ServerConfig.ServerConfig, (config) => ({ ...config, localAgentRuns: false })),
-).pipe(
-  Layer.provide(ServerConfig.layerTest(process.cwd(), { prefix: "t3-cloud-only-host-" })),
-  Layer.provide(NodeServices.layer),
-);
+const layerCloudOnlyHostConfig = (localAutomationRuns: boolean) =>
+  Layer.effect(
+    ServerConfig.ServerConfig,
+    Effect.map(ServerConfig.ServerConfig, (config) => ({
+      ...config,
+      localAgentRuns: false,
+      localAutomationRuns,
+    })),
+  ).pipe(
+    Layer.provide(ServerConfig.layerTest(process.cwd(), { prefix: "t3-cloud-only-host-" })),
+    Layer.provide(NodeServices.layer),
+  );
 
 function makeHarness(options: HarnessOptions = {}) {
   const layerDatabase = SqlitePersistence.layerMemory;
@@ -149,7 +155,10 @@ function makeHarness(options: HarnessOptions = {}) {
     layerRegistry,
     { databaseLayer: layerDatabase, runEffectWorker: false },
   );
-  const layerHostConfig = options.cloudOnlyHost === true ? layerCloudOnlyHostConfig : Layer.empty;
+  const layerHostConfig =
+    options.cloudOnlyHost === undefined || options.cloudOnlyHost === false
+      ? Layer.empty
+      : layerCloudOnlyHostConfig(options.cloudOnlyHost === "automations");
   const layerServerSettings = ServerSettings.layerTest(options.serverSettings);
   const layerReceipts = CommandReceiptStore.layer.pipe(Layer.provide(layerDatabase));
   const layerThreadManagement = ThreadManagement.layer.pipe(
@@ -441,6 +450,67 @@ it.effect("a cloud-only host refuses scheduled runs and leaves no thread behind"
       [existing.threadId],
     );
     assert.deepStrictEqual((yield* threads.getThreadProjection(existing.threadId)).messages, []);
+  }).pipe(Effect.provide(Layer.mergeAll(harness.layer, layerScheduledTasks)));
+});
+
+it.effect("a host that runs only automations runs a scheduled task but still refuses chats", () => {
+  const harness = makeHarness({ cloudOnlyHost: "automations" });
+  const layerScheduledTasks = ScheduledTasks.layer.pipe(
+    Layer.provide(
+      Layer.mergeAll(
+        harness.layer,
+        NodeCrypto.layer,
+        Scheduler.layer,
+        Layer.mock(SecretRequests.SecretRequests)({}),
+      ),
+    ),
+  );
+  return Effect.gen(function* () {
+    const tasks = yield* ScheduledTasks.ScheduledTaskService;
+    const threads = yield* ThreadManagement.ThreadManagementService;
+    const launches = yield* ThreadLaunch.ThreadLaunchService;
+    const { task } = yield* tasks.upsert({
+      id: ScheduledTaskId.make("scheduled-task:automations-only"),
+      title: "Sentry dispatcher",
+      prompt: "Decide where this issue gets fixed.",
+      enabled: false,
+      schedule: { type: "interval", everyMs: 60_000 },
+      projectId,
+      threadId: null,
+      workspaceStrategy: { type: "root" },
+      modelSelection,
+      runtimeMode: "full-access",
+      interactionMode: "default",
+      createdBy: "user",
+      creationSource: "web",
+    });
+    assert.equal(task.target, "local");
+    const ran = yield* tasks.runNow({ id: task.id });
+    assert.equal(ran.task.lastRunStatus, "succeeded");
+    const projection = yield* threads.getThreadProjection(ran.threadId!);
+    assert.equal((yield* encodeThreadProjection(projection)).messages[0]?.scheduledTaskId, task.id);
+
+    const chat = yield* launches
+      .launch({
+        ...launchInput({ command: "command:automations-only:chat", thread: "thread:chat" }),
+        initialMessage: { text: "Run this here", attachments: [] },
+      })
+      .pipe(Effect.flip);
+    const followUp = yield* threads
+      .dispatch({
+        type: "message.dispatch",
+        commandId: CommandId.make("command:automations-only:message"),
+        threadId: ran.threadId!,
+        messageId: MessageId.make("message:automations-only"),
+        text: "And this too",
+        attachments: [],
+        dispatchMode: { type: "start_immediately" },
+        createdBy: "user",
+        creationSource: "web",
+      })
+      .pipe(Effect.flip);
+    for (const refusal of [chat, followUp])
+      assert.include(String(refusal.cause), LOCAL_AGENT_RUNS_DISABLED_MESSAGE);
   }).pipe(Effect.provide(Layer.mergeAll(harness.layer, layerScheduledTasks)));
 });
 

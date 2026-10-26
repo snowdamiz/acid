@@ -94,6 +94,11 @@ export class ServerConfig extends Context.Service<
     readonly tailscaleServePort: number;
     /** False on a host that only provisions cloud environments: it refuses to start agent turns. */
     readonly localAgentRuns: boolean;
+    /**
+     * On such a host, lets scheduled and webhook tasks still run their agent here, so an
+     * automation can decide which cloud environment gets the work. Chats never run here.
+     */
+    readonly localAutomationRuns?: boolean;
   }
 >()("t3/config/ServerConfig") {
   static readonly layerTest = (

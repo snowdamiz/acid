@@ -49,7 +49,11 @@ import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
 import type * as Orchestrator from "./Orchestrator.ts";
 import { makeProviderFailure } from "@t3tools/provider-core/server/failure";
 import { randomUuidV4 } from "@t3tools/provider-core/server/randomUuid";
-import { LOCAL_AGENT_RUNS_DISABLED_MESSAGE, localAgentRunsEnabled } from "./cloudOnlyHost.ts";
+import {
+  LOCAL_AGENT_RUNS_DISABLED_MESSAGE,
+  localAgentRunsEnabled,
+  localAutomationRunsEnabled,
+} from "./cloudOnlyHost.ts";
 import * as ThreadManagement from "./ThreadManagementService.ts";
 
 export type ThreadLaunchWorkspaceStrategy =
@@ -210,6 +214,7 @@ const make = Effect.gen(function* () {
   const ids = yield* IdAllocator.IdAllocatorV2;
   const threads = yield* ThreadManagement.ThreadManagementService;
   const localAgentRuns = yield* localAgentRunsEnabled;
+  const localAutomationRuns = yield* localAutomationRunsEnabled;
   const managedFolders = yield* ManagedProjectFolders.ManagedProjectFolders;
   const preparationScope = yield* Scope.make("sequential");
   const scheduledLaunches = yield* Ref.make<ReadonlySet<CommandId>>(new Set());
@@ -819,7 +824,11 @@ const make = Effect.gen(function* () {
           ? { ...request, workspaceStrategy: { type: "root" } }
           : request;
       // Refused before the thread is created, so a cloud-only host keeps no empty thread.
-      if (!localAgentRuns && input.initialMessage !== undefined) {
+      if (
+        !localAgentRuns &&
+        input.initialMessage !== undefined &&
+        !(localAutomationRuns && input.initialMessage.scheduledTaskId !== undefined)
+      ) {
         return yield* mapError(
           input,
           "dispatch-message",
