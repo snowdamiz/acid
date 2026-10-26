@@ -3,7 +3,7 @@ import * as NodeFSP from "node:fs/promises";
 import * as NodeOS from "node:os";
 import * as NodePath from "node:path";
 import { expect, it } from "vite-plus/test";
-import { readConfig, resolveControlConfigPath } from "./config.ts";
+import { e2bTimeoutMs, readConfig, resolveControlConfigPath } from "./config.ts";
 
 it("loads private configuration and rejects ambiguous target mappings", async () => {
   const directory = await NodeFSP.mkdtemp(NodePath.join(NodeOS.tmpdir(), "t3-cloud-config-"));
@@ -79,6 +79,41 @@ it("reads a warm base refresh interval of zero or more hours and refuses a negat
   };
   try {
     expect([await read(0), await read(6), await read(-1)]).toEqual([0, 6, "refused"]);
+  } finally {
+    await NodeFSP.rm(directory, { recursive: true, force: true });
+  }
+});
+
+it("keeps E2B boxes six hours unless a plan's cap sets fewer minutes, and refuses zero", async () => {
+  const directory = await NodeFSP.mkdtemp(NodePath.join(NodeOS.tmpdir(), "t3-cloud-config-"));
+  const path = NodePath.join(directory, "config.json");
+  const read = async (provisioning: Record<string, unknown>) => {
+    await NodeFSP.writeFile(
+      path,
+      JSON.stringify({
+        e2bApiKey: "test-key",
+        broker: {
+          sandboxId: "broker",
+          metadata: { owner: "test" },
+          url: "https://controller.invalid",
+          ingressKey: "test-ingress",
+        },
+        targets: [],
+        provisioning,
+      }),
+      { mode: 0o600 },
+    );
+    return readConfig(path).then(
+      (config) => e2bTimeoutMs(config.provisioning),
+      () => "refused",
+    );
+  };
+  try {
+    expect([
+      await read({}),
+      await read({ e2bTimeoutMinutes: 60 }),
+      await read({ e2bTimeoutMinutes: 0 }),
+    ]).toEqual([6 * 3_600_000, 3_600_000, "refused"]);
   } finally {
     await NodeFSP.rm(directory, { recursive: true, force: true });
   }

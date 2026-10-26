@@ -287,6 +287,7 @@ function e2bPythonPort(sandbox: Sandbox, deadline?: number): RemotePreparationPo
 export function makeE2bProvisionRuntime(
   connection: E2BClientOpts,
   onResumeRetry?: (retry: E2bResumeRetry) => void,
+  sandboxTimeoutMs = 6 * 3_600_000,
 ) {
   const client = new E2B(connection);
   const verify = async (
@@ -316,7 +317,7 @@ export function makeE2bProvisionRuntime(
       (requestTimeoutMs) =>
         client.Sandbox.connect(sandboxId, {
           requestTimeoutMs,
-          timeoutMs: retentionTimeoutMs(operation.request.retentionDeadline, 6 * 3_600_000),
+          timeoutMs: retentionTimeoutMs(operation.request.retentionDeadline, sandboxTimeoutMs),
         }),
       onResumeRetry,
     );
@@ -418,7 +419,7 @@ export function makeE2bProvisionRuntime(
         info.metadata.account !== lease.providerInstanceId
       )
         throw new Error("The imported sandbox lease does not match this provider resource.");
-      await client.Sandbox.setTimeout(lease.sandboxId, 6 * 3_600_000);
+      await client.Sandbox.setTimeout(lease.sandboxId, sandboxTimeoutMs);
     },
     dispose: async (operation: ProvisionOperation, sandboxId: string) => {
       try {
