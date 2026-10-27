@@ -40,6 +40,7 @@ import * as McpProviderSessions from "@t3tools/provider-core/server/McpProviderS
 import * as McpSessionRegistry from "../mcp/McpSessionRegistry.ts";
 import * as SqlitePersistence from "../persistence/Sqlite.ts";
 import * as ServerSettings from "../serverSettings.ts";
+import * as ServerConfig from "../config.ts";
 import { CodexProviderCapabilitiesV2 } from "./Adapters/CodexAdapterV2.ts";
 import * as EventSink from "./EventSink.ts";
 import * as EventStore from "./EventStore.ts";
@@ -508,6 +509,8 @@ function layerTest(input: {
   readonly scopeCloseReached?: Deferred.Deferred<void>;
   readonly serverSettingsLayer?: ReturnType<typeof ServerSettings.layerTest>;
   readonly projectServiceLayer?: Layer.Layer<ProjectService.ProjectService>;
+  /** A cloud-only host (T3CODE_LOCAL_AGENT_RUNS=false), whose only runs are its automations. */
+  readonly cloudOnlyHost?: boolean;
 }) {
   const layerConfiguredEventSink =
     input.flakyReleaseWrites !== undefined
@@ -590,6 +593,13 @@ function layerTest(input: {
           layerTestStores,
           ...(input.serverSettingsLayer === undefined ? [] : [input.serverSettingsLayer]),
           ...(input.projectServiceLayer === undefined ? [] : [input.projectServiceLayer]),
+          ...(input.cloudOnlyHost === true
+            ? [
+                Layer.mock(ServerConfig.ServerConfig)({
+                  localAgentRuns: false,
+                } as ServerConfig.ServerConfig["Service"]),
+              ]
+            : []),
         ),
       ),
     ),
@@ -1585,6 +1595,42 @@ it.effect(
             mcpConfigs,
           }),
         ),
+      );
+    }),
+);
+
+it.effect(
+  "ProviderSessionManagerV2 gives a cloud-only host's runs only the cloud-launch capability",
+  () =>
+    Effect.gen(function* () {
+      const state = yield* Ref.make(emptyState);
+      const mcpConfigs = yield* Ref.make<
+        ReadonlyArray<McpProviderSession.McpProviderSessionConfig | undefined>
+      >([]);
+      yield* Effect.gen(function* () {
+        const eventSink = yield* EventSink.EventSinkV2;
+        const idAllocator = yield* IdAllocator.IdAllocatorV2;
+        const manager = yield* ProviderSessionManager.ProviderSessionManagerV2;
+        const registry = yield* McpSessionRegistry.McpSessionRegistry;
+        const now = yield* DateTime.now;
+        const threadId = ThreadId.make("thread-provider-session-manager-automation-host");
+        const providerSessionId = yield* idAllocator.allocate.providerSession({
+          providerInstanceId: modelSelection.instanceId,
+          threadId,
+        });
+        yield* eventSink.write({
+          events: [yield* makeThreadCreatedEvent({ idAllocator, threadId, now })],
+        });
+        yield* manager.open({ threadId, providerSessionId, modelSelection, runtimePolicy });
+
+        const token = (yield* Ref.get(mcpConfigs))[0]?.authorizationHeader.replace(
+          /^Bearer\s+/,
+          "",
+        );
+        const resolved = yield* registry.resolve(token!);
+        assert.deepEqual(resolved?.capabilities, new Set(["cloud-launch"]));
+      }).pipe(
+        Effect.provide(layerTest({ state, idleTimeoutMs: 1_000, mcpConfigs, cloudOnlyHost: true })),
       );
     }),
 );

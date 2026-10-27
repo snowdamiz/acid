@@ -45,7 +45,7 @@ import * as Semaphore from "effect/Semaphore";
 import * as Stream from "effect/Stream";
 import * as SqlClient from "effect/sql/SqlClient";
 
-import { localAutomationRunsEnabled } from "../orchestration-v2/cloudOnlyHost.ts";
+import { localAutomationRunsEnabled } from "../orchestration-v2/hostMode.ts";
 import * as ThreadLaunchService from "../orchestration-v2/ThreadLaunchService.ts";
 import * as ManagedProjectFolders from "../project/ManagedProjectFolders.ts";
 import * as Metrics from "../observability/Metrics.ts";

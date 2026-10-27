@@ -250,6 +250,24 @@ describe("ClaudeAdapterV2 runtime query policy", () => {
     assert.isUndefined(options.extraArgs?.["dangerously-skip-permissions"]);
   });
 
+  it("isolates an automation host's query from disk settings, project MCP servers and launch arguments", () => {
+    const options = ClaudeAdapterV2.makeClaudeQueryOptions({
+      modelSelection: CLAUDE_TEST_MODEL_SELECTION,
+      nativeThreadId: "native-automation-host",
+      resume: false,
+      cwd: "/data/repos/app",
+      permissionMode: "bypassPermissions",
+      settings: { ...AUTO_COMPACT_CLAUDE_SETTINGS, launchArgs: "--tools Bash --add-dir /" },
+      tools: ClaudeAdapterV2.CLAUDE_AUTOMATION_HOST_TOOLS,
+      isolated: true,
+    });
+    assert.deepEqual(options.tools, ["ToolSearch"]);
+    assert.deepEqual(options.settingSources, []);
+    assert.isTrue(options.strictMcpConfig);
+    assert.isUndefined(options.extraArgs?.tools);
+    assert.isUndefined(options.extraArgs?.["add-dir"]);
+  });
+
   it("gives delegated children Claude's subagent prompt cache TTL", () => {
     const lineage = (relationshipToParent: "fork" | "subagent" | null) => ({
       lineage: {

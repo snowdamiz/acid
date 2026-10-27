@@ -1673,6 +1673,13 @@ it("offers each cloud platform only when its runtime and defaults are configured
   expect(
     provisionProviders(configWith({ templateId: "t3", runtimeArtifacts: { linux: runtime } })),
   ).toEqual(["e2b"]);
+  // A host whose users bring their own E2B keys offers none until one is saved.
+  expect(
+    provisionProviders({
+      ...configWith({ templateId: "t3", runtimeArtifacts: { linux: runtime } }),
+      e2bApiKey: "",
+    }),
+  ).toEqual([]);
   expect(
     provisionProviders(
       configWith({

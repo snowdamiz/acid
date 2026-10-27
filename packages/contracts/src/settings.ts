@@ -855,6 +855,8 @@ export type ObservabilitySettings = typeof ObservabilitySettings.Type;
 export const CloudCredentialsSettings = Schema.Struct({
   /** Starts E2B sandboxes. */
   e2bApiKey: TrimmedString.pipe(Schema.withDecodingDefault(Effect.succeed("")), secretSetting),
+  /** What cloud machines clone private repositories and open pull requests with. */
+  githubToken: TrimmedString.pipe(Schema.withDecodingDefault(Effect.succeed("")), secretSetting),
   /** Given to agents on every cloud machine as `SENTRY_AUTH_TOKEN`, so they can read Sentry issues. */
   sentryAuthToken: TrimmedString.pipe(
     Schema.withDecodingDefault(Effect.succeed("")),
@@ -1701,6 +1703,7 @@ export const ServerSettingsPatch = Schema.Struct({
   cloudCredentials: Schema.optionalKey(
     Schema.Struct({
       e2bApiKey: Schema.optionalKey(TrimmedString),
+      githubToken: Schema.optionalKey(TrimmedString),
       sentryAuthToken: Schema.optionalKey(TrimmedString),
       sentryOrg: Schema.optionalKey(TrimmedString),
     }),

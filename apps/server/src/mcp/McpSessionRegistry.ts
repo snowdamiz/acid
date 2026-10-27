@@ -22,6 +22,8 @@ export interface McpCredentialRequest {
    */
   readonly browserToolsAvailable?: boolean;
   readonly capabilities?: ReadonlySet<McpInvocationContext.McpCapability>;
+  /** The whole grant, in place of the thread defaults and `capabilities`. */
+  readonly onlyCapabilities?: ReadonlySet<McpInvocationContext.McpCapability>;
 }
 
 export interface McpIssuedCredential {
@@ -111,12 +113,14 @@ const makeWithOptions = Effect.fn("McpSessionRegistry.make")(function* (
           providerInstanceId: ProviderInstanceId.make(request.providerInstanceId),
         },
         client: undefined,
-        capabilities: new Set<McpInvocationContext.McpCapability>([
-          "orchestration",
-          "worktree",
-          "pull-requests",
-          ...(request.capabilities ?? (browserToolsAvailable ? (["preview"] as const) : [])),
-        ]),
+        capabilities: new Set<McpInvocationContext.McpCapability>(
+          request.onlyCapabilities ?? [
+            "orchestration",
+            "worktree",
+            "pull-requests",
+            ...(request.capabilities ?? (browserToolsAvailable ? (["preview"] as const) : [])),
+          ],
+        ),
         issuedAt,
       };
       yield* SynchronizedRef.update(state, ({ records }) => {
