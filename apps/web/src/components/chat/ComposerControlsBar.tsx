@@ -8,6 +8,7 @@ import { ComposerControl, ComposerControlSeparator } from "./ComposerControl";
 import {
   ComposerFooterModeControls,
   ComposerModelPicker,
+  type PotetoModeControl,
   type RuntimeModeOption,
 } from "./ComposerFooterControls";
 import {
@@ -47,6 +48,7 @@ export function ComposerControlsBar(props: {
   onPromptEdit: (edit: (prompt: string) => string) => void;
   planModeEnabled: boolean;
   planModeUiEnabled: boolean;
+  potetoMode: PotetoModeControl | null;
   interactionMode: ProviderInteractionMode;
   compatibleRuntimeMode: RuntimeMode;
   compatibleRuntimeModeOptions: ReadonlyArray<RuntimeModeOption>;
@@ -97,6 +99,7 @@ export function ComposerControlsBar(props: {
     onPromptEdit,
     planModeEnabled,
     planModeUiEnabled,
+    potetoMode,
     interactionMode,
     compatibleRuntimeMode,
     compatibleRuntimeModeOptions,
@@ -186,6 +189,7 @@ export function ComposerControlsBar(props: {
           interactionMode={interactionMode}
           runtimeMode={compatibleRuntimeMode}
           runtimeModeOptions={compatibleRuntimeModeOptions}
+          potetoMode={potetoMode}
           size={composerControlsCollapsed ? "xs" : "sm"}
           hidden={composerControlsHidden || restingHiddenBlockCount > 0}
           onToggleInteractionMode={toggleInteractionMode}
@@ -320,6 +324,7 @@ export function ComposerControlsBar(props: {
             size={composerControlsCollapsed ? "xs" : "sm"}
             hidden={composerControlsHidden || hiddenRestingBlockIds.length === 0}
             showInteractionModeToggle={planModeUiEnabled && hiddenRestingBlockIds.includes("mode")}
+            potetoMode={hiddenRestingBlockIds.includes("mode") ? potetoMode : null}
             traitsMenuContent={
               hiddenRestingBlockIds.includes("traits") ? providerTraitsMenuContent : undefined
             }

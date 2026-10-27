@@ -52,6 +52,10 @@ const SessionSyncConfig = Schema.Struct({
 });
 type SessionSyncConfig = typeof SessionSyncConfig.Type;
 const SessionSyncConfigJson = Schema.fromJsonString(SessionSyncConfig);
+const decodeSessionSyncConfig = Schema.decodeEffect(SessionSyncConfigJson);
+const encodeSessionSyncConfig = Schema.encodeEffect(SessionSyncConfigJson);
+const encodeUpload = Schema.encodeEffect(Schema.fromJsonString(CloudSessionFilesUpload));
+const decodeHomePaths = Schema.decodeUnknownEffect(Schema.Array(HomeRelativePath));
 
 export class SessionSyncError extends Schema.TaggedError<SessionSyncError>()("SessionSyncError", {
   detail: Schema.String,
@@ -74,7 +78,7 @@ const readConfig = Effect.fn("sessions.readConfig")(function* (baseDir: string) 
         }),
     ),
   );
-  return yield* Schema.decodeEffect(SessionSyncConfigJson)(text).pipe(
+  return yield* decodeSessionSyncConfig(text).pipe(
     Effect.mapError(
       () => new SessionSyncError({ detail: "session-sync.json is unreadable. Run setup again." }),
     ),
@@ -121,7 +125,7 @@ const upload = Effect.fn("sessions.upload")(function* (
   files: ReadonlyArray<HomeFile>,
 ) {
   const client = yield* HttpClient.HttpClient;
-  const body = yield* Schema.encodeEffect(Schema.fromJsonString(CloudSessionFilesUpload))({
+  const body = yield* encodeUpload({
     device: yield* HostProcess.Hostname,
     files,
   }).pipe(
@@ -297,7 +301,7 @@ const setupCommand = Command.make("setup", {
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
       const baseDir = yield* resolveBaseDir(Option.getOrUndefined(flags.baseDir));
-      const paths = yield* Schema.decodeUnknownEffect(Schema.Array(HomeRelativePath))(
+      const paths = yield* decodeHomePaths(
         flags.path.length > 0 ? flags.path : DEFAULT_SESSION_PATHS,
       ).pipe(
         Effect.mapError(
@@ -309,7 +313,7 @@ const setupCommand = Command.make("setup", {
       yield* push(config);
       yield* fs.makeDirectory(baseDir, { recursive: true });
       const file = yield* configPath(baseDir);
-      yield* fs.writeFileString(file, yield* Schema.encodeEffect(SessionSyncConfigJson)(config));
+      yield* fs.writeFileString(file, yield* encodeSessionSyncConfig(config));
       yield* fs.chmod(file, 0o600);
       if ((yield* HostProcess.Platform) !== "darwin") {
         yield* Console.log(

@@ -3,6 +3,7 @@ import { memo, type ReactNode } from "react";
 import { EllipsisIcon } from "lucide-react";
 import {
   Menu,
+  MenuCheckboxItem,
   MenuPopup,
   MenuRadioGroup,
   MenuRadioItem,
@@ -10,6 +11,8 @@ import {
   MenuTrigger,
 } from "../ui/menu";
 import { ComposerControl, ComposerControlIcon } from "./ComposerControl";
+import { PotatoIcon } from "../Icons";
+import type { PotetoModeControl } from "./ComposerFooterControls";
 import { useComposerMenuProps } from "./composerEventScope";
 import { useComposerMenuState } from "./useComposerMenuState";
 
@@ -21,6 +24,7 @@ export const CompactComposerControlsMenu = memo(function CompactComposerControls
     readonly label: string;
   }>;
   showInteractionModeToggle: boolean;
+  potetoMode: PotetoModeControl | null;
   traitsMenuContent?: ReactNode;
   size?: "sm" | "xs";
   /**
@@ -89,6 +93,21 @@ export const CompactComposerControlsMenu = memo(function CompactComposerControls
             </MenuRadioItem>
           ))}
         </MenuRadioGroup>
+        {props.potetoMode ? (
+          <>
+            <MenuDivider />
+            <MenuCheckboxItem
+              variant="switch"
+              checked={props.potetoMode.enabled}
+              onCheckedChange={props.potetoMode.onToggle}
+            >
+              <span className="inline-flex items-center gap-1.5">
+                <PotatoIcon className="size-3.5 text-muted-foreground" />
+                Poteto mode
+              </span>
+            </MenuCheckboxItem>
+          </>
+        ) : null}
       </MenuPopup>
     </Menu>
   );
