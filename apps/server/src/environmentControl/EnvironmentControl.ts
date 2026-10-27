@@ -17,6 +17,8 @@ import {
   type EnvironmentControlPresenceInput,
   type EnvironmentControlPresenceResult,
   type NamespaceAccount,
+  type CloudSessionFiles,
+  type CloudSessionFilesUpload,
   type EnvironmentProvisionAttachInput,
   type EnvironmentProvisionAttachResult,
   type EnvironmentProvisionInput,
@@ -89,6 +91,7 @@ import { makeProvisionControl } from "./ProvisionControl.ts";
 import { deliverFirstTurn } from "./firstTurn.ts";
 import { makeNamespaceAllocationPorts } from "./namespaceAllocation.ts";
 import { makeNamespaceLogin } from "./namespaceLogin.ts";
+import { makeSessionFileSync, sendHomeFiles } from "./sessionFileSync.ts";
 import {
   makeNamespaceAccountSession,
   makeNamespaceProvisionRuntime,
@@ -1427,6 +1430,13 @@ export class EnvironmentControl extends Context.Service<
     readonly namespaceAccount: Effect.Effect<NamespaceAccount, EnvironmentControlError>;
     /** Starts a browser sign-in to Namespace, or answers with the one waiting for the user. */
     readonly namespaceSignIn: Effect.Effect<NamespaceAccount, EnvironmentControlError>;
+    /** The CLI logins a computer syncs here, which every awake cloud machine is given. */
+    readonly sessionFiles: Effect.Effect<CloudSessionFiles, EnvironmentControlError>;
+    readonly uploadSessionFiles: (
+      input: CloudSessionFilesUpload,
+    ) => Effect.Effect<CloudSessionFiles, EnvironmentControlError>;
+    /** Forgets the synced logins and removes them from every cloud machine as it is next awake. */
+    readonly clearSessionFiles: Effect.Effect<CloudSessionFiles, EnvironmentControlError>;
   }
 >()("t3/environmentControl/EnvironmentControl") {}
 
@@ -1830,6 +1840,26 @@ export const layer = Layer.effect(
       },
     });
     yield* Effect.addFinalizer(() => Effect.sync(namespaceLogin.close));
+    const sessionFiles = makeSessionFileSync({
+      path: NodePath.join(secretsDir, "cloud-session-files.bin"),
+      awake: () => leaseRegistry.awake(),
+      send: sendHomeFiles,
+      onError: (lease, cause) =>
+        void runLogged(
+          Effect.logWarning("synced CLI logins could not be written to a cloud machine", {
+            leaseId: lease.leaseId,
+            cause,
+          }),
+        ),
+    });
+    yield* Effect.tryPromise(sessionFiles.sync).pipe(
+      Effect.ignore({
+        log: "Warn",
+        message: "synced CLI logins could not be kept on cloud machines",
+      }),
+      Effect.repeat(Schedule.spaced(Duration.seconds(15))),
+      Effect.forkScoped,
+    );
     const resolveNamespace = () => {
       namespace ??= (async () => {
         const manager = await resolve();
@@ -3357,6 +3387,22 @@ export const layer = Layer.effect(
         try: namespaceLogin.signIn,
         catch: () =>
           new EnvironmentControlError({ message: "The Namespace sign-in could not start." }),
+      }),
+      sessionFiles: Effect.tryPromise({
+        try: sessionFiles.read,
+        catch: () =>
+          new EnvironmentControlError({ message: "The synced CLI logins could not be read." }),
+      }),
+      uploadSessionFiles: (input) =>
+        Effect.tryPromise({
+          try: () => sessionFiles.upload(input),
+          catch: () =>
+            new EnvironmentControlError({ message: "The synced CLI logins could not be saved." }),
+        }),
+      clearSessionFiles: Effect.tryPromise({
+        try: sessionFiles.clear,
+        catch: () =>
+          new EnvironmentControlError({ message: "The synced CLI logins could not be cleared." }),
       }),
       touch: (input) =>
         importedLeases.has(input.leaseId)

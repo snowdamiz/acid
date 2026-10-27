@@ -1371,8 +1371,9 @@ export const ServerSettings = Schema.Struct({
   observability: ObservabilitySettings.pipe(Schema.withDecodingDefault(Effect.succeed({}))),
   cloudCredentials: CloudCredentialsSettings.pipe(Schema.withDecodingDefault(Effect.succeed({}))),
   /**
-   * A public HTTPS origin that forwards `/api/hooks/*` to this server, such as a tunnel. Webhook
-   * tasks report their URL on it, before the T3 Connect relay's.
+   * A public HTTPS URL that forwards `<its path>/api/hooks/*` to this server, such as a tunnel or a
+   * front serving several servers under their own paths. Webhook tasks report their URL under it,
+   * before the T3 Connect relay's.
    */
   publicWebhookOrigin: TrimmedString.pipe(Schema.withDecodingDefault(Effect.succeed(""))),
   sourceControlHosts: Schema.Record(Schema.String, SourceControlHostSettings).pipe(

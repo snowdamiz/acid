@@ -2,8 +2,10 @@ import * as Schema from "effect/Schema";
 import { describe, expect, it } from "vite-plus/test";
 
 import {
+  CloudSessionFilesUpload,
   DiscoveredProvisionedEnvironment,
   EnvironmentProvisionResumeResult,
+  MAX_SESSION_FILES_BYTES,
 } from "./environmentControl.ts";
 
 const decodeDiscovered = Schema.decodeUnknownSync(
@@ -101,5 +103,30 @@ describe("EnvironmentProvisionResumeResult", () => {
 
   it("reads a cause from a newer host as a plain refusal", () => {
     expect(decodeResume({ ...refused, cause: "provider-on-fire" })).toEqual(refused);
+  });
+});
+
+describe("CloudSessionFilesUpload", () => {
+  const accepts = Schema.is(CloudSessionFilesUpload);
+  const upload = (path: string, contentsBase64 = "e30=") => ({
+    device: "laptop",
+    files: [{ path, contentsBase64 }],
+  });
+
+  it("takes paths inside the home, outside the machine's own T3 state", () => {
+    expect(accepts(upload(".aws/sso/cache/token.json"))).toBe(true);
+    for (const path of [
+      "/etc/passwd",
+      "../.ssh/id",
+      ".aws/../../x",
+      ".aws//config",
+      ".t3/userdata/db",
+    ])
+      expect(accepts(upload(path)), path).toBe(false);
+  });
+
+  it("refuses a set larger than every waking machine should be sent", () => {
+    const base64Length = Math.ceil(((MAX_SESSION_FILES_BYTES + 3) / 3) * 4);
+    expect(accepts(upload(".npmrc", "A".repeat(base64Length)))).toBe(false);
   });
 });

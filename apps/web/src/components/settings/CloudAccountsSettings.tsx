@@ -1,5 +1,7 @@
+import { useAtomValue } from "@effect/atom-react";
 import type {
   CloudCredentialsSettings,
+  CloudSessionFiles,
   EnvironmentId,
   NamespaceAccount,
   ServerSettingsPatch,
@@ -25,15 +27,14 @@ const readCloudCredentials = (settings: UnifiedSettings): CloudCredentialsSettin
   settings.cloudCredentials;
 const readPublicWebhookOrigin = (settings: UnifiedSettings): string => settings.publicWebhookOrigin;
 
-/** The host accepts a bare HTTPS origin only, and ignores anything else. */
-function isPublicOrigin(value: string): boolean {
+/** The host accepts an HTTPS URL, path included, and ignores anything with credentials or a query. */
+function isPublicWebhookBase(value: string): boolean {
   const url = URL.parse(value);
   return (
     url !== null &&
     url.protocol === "https:" &&
     !url.username &&
     !url.password &&
-    url.pathname === "/" &&
     !url.search &&
     !url.hash
   );
@@ -228,6 +229,61 @@ function NamespaceAccountRow({ environmentId }: { environmentId: EnvironmentId }
   );
 }
 
+function syncedLoginsStatus(synced: CloudSessionFiles | null, error: string | null): string {
+  if (error) return "The host could not read the synced logins.";
+  if (synced === null) return "Checking…";
+  if (synced.files.length === 0) return "No computer syncs its logins here.";
+  const at = synced.syncedAt ? new Date(synced.syncedAt) : null;
+  return [
+    `${synced.files.length} ${synced.files.length === 1 ? "file" : "files"}`,
+    synced.device ? `from ${synced.device}` : null,
+    at && !Number.isNaN(at.getTime()) ? `synced ${at.toLocaleString()}` : null,
+  ]
+    .filter(Boolean)
+    .join(", ");
+}
+
+/**
+ * Logins a computer syncs with `t3 sessions`. Clearing them here removes them from every cloud
+ * machine; the computer puts them back on its next sync unless `t3 sessions remove` ran there.
+ */
+function SyncedLoginsRow({ environmentId }: { environmentId: EnvironmentId }) {
+  const query = useEnvironmentQuery(serverEnvironment.sessionFiles({ environmentId, input: {} }));
+  const canClear = useAtomValue(serverEnvironment.clearSessionFiles.permissionAtom(environmentId));
+  const clear = useAtomCommand(serverEnvironment.clearSessionFiles, {
+    label: "clear synced CLI logins",
+  });
+  const synced = query.data;
+  return (
+    <div className="grid gap-2 border-t border-border px-4 py-3">
+      <Label>CLI logins from your computer</Label>
+      <p className="max-w-2xl text-xs leading-relaxed text-muted-foreground">
+        Agents on every cloud machine get the AWS, gcloud, kubectl and npm logins your computer
+        syncs here, so logging in on your computer logs them in too. Connect a computer by running{" "}
+        <code>t3 sessions setup --host &lt;this host&gt; --token &lt;token&gt;</code> on it.
+      </p>
+      <div className="flex items-center justify-between gap-3">
+        <p role="status" className="text-xs text-muted-foreground">
+          {syncedLoginsStatus(synced, query.error)}
+        </p>
+        <Button
+          size="xs"
+          variant="outline"
+          disabled={!canClear || !synced || synced.files.length === 0}
+          onClick={() => void clear({ environmentId, input: {} })}
+        >
+          Clear
+        </Button>
+      </div>
+      {synced && synced.files.length > 0 ? (
+        <p className="break-all text-xs text-muted-foreground">
+          {synced.files.map((file) => file.path).join(", ")}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 function HostCloudAccounts({
   environmentId,
   label,
@@ -276,6 +332,7 @@ function HostCloudAccounts({
         onSave={(value) => save({ cloudCredentials: { githubToken: value } })}
       />
       <NamespaceAccountRow environmentId={environmentId} />
+      <SyncedLoginsRow environmentId={environmentId} />
       <CredentialRow
         id={`sentry-auth-token-${environmentId}`}
         title="Sentry auth token"
@@ -311,9 +368,11 @@ function HostCloudAccounts({
         saved={publicWebhookOrigin}
         placeholder="https://hooks.example.com"
         invalid={(draft) =>
-          isPublicOrigin(draft) ? null : "Enter an HTTPS origin, with no path, such as a tunnel's."
+          isPublicWebhookBase(draft)
+            ? null
+            : "Enter an HTTPS URL with no query, such as a tunnel's."
         }
-        description="An HTTPS origin that forwards /api/hooks/* to this host, such as a Cloudflare Tunnel. Webhook tasks show their URL on it, so services like Sentry can reach them."
+        description="An HTTPS URL that forwards its path plus /api/hooks/* to this host, such as a Cloudflare Tunnel. Webhook tasks show their URL under it, so services like Sentry can reach them."
         onSave={(value) => save({ publicWebhookOrigin: value })}
       />
     </>

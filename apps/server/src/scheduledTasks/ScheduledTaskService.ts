@@ -118,23 +118,14 @@ export function relayHookBaseUrl(input: {
 }
 
 /**
- * The hooks route on a public HTTPS origin that forwards it to this server, such as a tunnel, or
- * null for anything other than a bare origin.
+ * The hooks route under a public HTTPS URL that forwards it to this server, such as a tunnel or a
+ * front that serves several servers under their own path, or null for anything else.
  */
-export function publicHookBaseUrl(origin: string): string | null {
-  const url = URL.parse(origin);
-  if (
-    url === null ||
-    url.protocol !== "https:" ||
-    url.username ||
-    url.password ||
-    url.pathname !== "/" ||
-    url.search ||
-    url.hash
-  ) {
-    return null;
-  }
-  return `${url.origin}${WEBHOOK_ROUTE_PREFIX}`;
+export function publicHookBaseUrl(base: string): string | null {
+  const url = URL.parse(base);
+  if (url === null || url.protocol !== "https:" || url.username || url.password) return null;
+  if (url.search || url.hash) return null;
+  return `${url.origin}${url.pathname.replace(/\/+$/, "")}${WEBHOOK_ROUTE_PREFIX}`;
 }
 
 export class ScheduledTaskWebhookOrigin extends Context.Reference<Effect.Effect<WebhookOrigin>>(
