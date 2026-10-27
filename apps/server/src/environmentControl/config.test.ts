@@ -382,17 +382,23 @@ it("uses the cloud credentials saved in settings before the file's, and gives ag
     { name: "SENTRY_AUTH_TOKEN", source: "/missing/sentry-token" },
     { name: "OTHER", source: "/missing/other" },
   ];
-  const saved = { e2bApiKey: "settings-key", sentryAuthToken: "sntryu_token", sentryOrg: "acme" };
+  const saved = {
+    e2bApiKey: "settings-key",
+    githubToken: "ghp_settings",
+    sentryAuthToken: "sntryu_token",
+    sentryOrg: "acme",
+  };
   try {
     await NodeFSP.writeFile(
       path,
       JSON.stringify({ broker, targets: [], provisioning: { shellEnvironment } }),
       { mode: 0o600 },
     );
-    // The file alone has no E2B key; the saved one completes it.
-    await expect(readConfig(path)).rejects.toThrow();
+    // A file without keys loads, offering no E2B until a key is saved.
+    expect((await readConfig(path)).e2bApiKey).toBe("");
     const config = await readConfig(path, saved);
     expect(config.e2bApiKey).toBe("settings-key");
+    expect(config.provisioning?.githubToken).toBe("ghp_settings");
     expect(config.provisioning?.shellEnvironment).toEqual([
       { name: "OTHER", source: "/missing/other" },
       { name: "SENTRY_AUTH_TOKEN", value: "sntryu_token" },
@@ -408,7 +414,12 @@ it("uses the cloud credentials saved in settings before the file's, and gives ag
         provisioning: { shellEnvironment },
       }),
     );
-    const unsaved = await readConfig(path, { e2bApiKey: "", sentryAuthToken: "", sentryOrg: "" });
+    const unsaved = await readConfig(path, {
+      e2bApiKey: "",
+      githubToken: "",
+      sentryAuthToken: "",
+      sentryOrg: "",
+    });
     expect(unsaved.e2bApiKey).toBe("file-key");
     expect(unsaved.provisioning?.shellEnvironment).toEqual(shellEnvironment);
   } finally {

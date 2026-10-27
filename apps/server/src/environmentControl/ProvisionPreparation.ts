@@ -356,7 +356,7 @@ export function provisionProviders(
     (provider) =>
       configuredRuntimeArtifact(config, provider) !== null &&
       (provider === "e2b"
-        ? Boolean(config.provisioning?.templateId)
+        ? Boolean(config.e2bApiKey && config.provisioning?.templateId)
         : provider === "modal"
           ? Boolean(config.modalTokenId && config.modalTokenSecret && config.provisioning?.modal)
           : config.provisioning?.namespace !== undefined),

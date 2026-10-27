@@ -7,6 +7,7 @@ import {
   EnvironmentId,
   TrimmedNonEmptyString,
 } from "@t3tools/contracts";
+import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 
 export function canonicalRepository(repository: string): string {
@@ -362,7 +363,8 @@ export const e2bTimeoutMs = (provisioning: Provisioning | undefined) =>
   (provisioning?.e2bTimeoutMinutes ?? 360) * 60_000;
 
 export const EnvironmentControlConfig = Schema.Struct({
-  e2bApiKey: TrimmedNonEmptyString,
+  // Empty when the key comes from settings only, as on a host each user brings their own keys to.
+  e2bApiKey: Schema.String.pipe(Schema.withDecodingDefault(Effect.succeed(""))),
   provisioning: Schema.optional(Provisioning),
   namespaceToken: Schema.optional(TrimmedNonEmptyString),
   modalTokenId: Schema.optional(TrimmedNonEmptyString),
@@ -379,10 +381,10 @@ export type ManagedTarget = typeof Target.Type;
 const decodeConfig = Schema.decodeUnknownSync(EnvironmentControlConfig);
 
 /**
- * The Sentry token and organization saved in settings, given to agents on every cloud machine in
- * place of any the file names.
+ * The GitHub token, Sentry token and organization saved in settings, used in place of the file's:
+ * the GitHub token for cloning and pull requests, the Sentry ones given to every machine's agents.
  */
-function withSentry(
+function withSavedProvisioning(
   config: EnvironmentControlConfig,
   saved: CloudCredentialsSettings | undefined,
 ): EnvironmentControlConfig {
@@ -392,12 +394,13 @@ function withSentry(
       : []),
     ...(saved?.sentryOrg ? [{ name: "SENTRY_ORG", value: saved.sentryOrg }] : []),
   ];
-  if (!variables.length || !config.provisioning) return config;
+  if (!config.provisioning || (!variables.length && !saved?.githubToken)) return config;
   const replaced = new Set(variables.map(({ name }) => name));
   return {
     ...config,
     provisioning: {
       ...config.provisioning,
+      ...(saved?.githubToken ? { githubToken: saved.githubToken } : {}),
       shellEnvironment: [
         ...(config.provisioning.shellEnvironment ?? []).filter(({ name }) => !replaced.has(name)),
         ...variables,
@@ -412,7 +415,7 @@ export async function readConfig(
   saved?: CloudCredentialsSettings,
 ): Promise<EnvironmentControlConfig> {
   const file: unknown = JSON.parse(await NodeFSP.readFile(path, "utf8"));
-  const config = withSentry(
+  const config = withSavedProvisioning(
     decodeConfig(
       saved?.e2bApiKey && typeof file === "object" && file !== null && !Array.isArray(file)
         ? { ...file, e2bApiKey: saved.e2bApiKey }

@@ -259,6 +259,22 @@ function HostCloudAccounts({
         }
         onSave={(value) => save({ cloudCredentials: { e2bApiKey: value } })}
       />
+      <CredentialRow
+        id={`github-token-cloud-${environmentId}`}
+        title="GitHub token"
+        secret
+        saved={credentials.githubToken}
+        description={
+          <>
+            What cloud machines clone private repositories, push and open pull requests with. Give
+            it read and write access to contents and pull requests.{" "}
+            <ExternalLink href="https://github.com/settings/personal-access-tokens/new">
+              Create a token
+            </ExternalLink>
+          </>
+        }
+        onSave={(value) => save({ cloudCredentials: { githubToken: value } })}
+      />
       <NamespaceAccountRow environmentId={environmentId} />
       <CredentialRow
         id={`sentry-auth-token-${environmentId}`}
