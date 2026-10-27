@@ -177,6 +177,7 @@ import {
   type BoxBackupResult,
 } from "./boxBackup.ts";
 import { BoxUsageStore } from "../usage/boxUsage.ts";
+import { backUpWorkspace } from "./workspaceBackup.ts";
 
 const isProvisionRequestId = Schema.is(ProvisionRequestId);
 
@@ -2862,10 +2863,10 @@ export const layer = Layer.effect(
           ),
         );
     /**
-     * Removes paused Devboxes past their cleanup time, through the same cancel a user's delete
-     * takes. Their work is pushed with the configured GitHub token, which reaches the guest only
-     * on the backup script's stdin. Each step resolves the current service, so the sweep takes
-     * the same per-box lock a client's resume does.
+     * Removes paused Devboxes and E2B sandboxes past their cleanup time, through the same cancel
+     * a user's delete takes. Their work is pushed with the configured GitHub token, which reaches
+     * the guest only on the backup script's stdin. Each step resolves the current service, so the
+     * sweep takes the same per-box lock a client's resume does.
      */
     const cleanUpPausedBoxes = createCleanupSweep({
       now: () => Date.now(),
@@ -2873,7 +2874,7 @@ export const layer = Layer.effect(
       candidates: async () => {
         const candidates: Array<CleanupCandidate> = [];
         for (const lease of await leaseRegistry.paused())
-          if (lease.namespaceResource && (await readyDevbox(lease.leaseId)))
+          if (lease.namespaceResource ? await readyDevbox(lease.leaseId) : await e2bBox(lease))
             candidates.push(await cleanupCandidate(lease));
         return candidates;
       },
@@ -2884,24 +2885,34 @@ export const layer = Layer.effect(
       holdBox: async (sandboxId) => (await resolve())?.holdBox(sandboxId, "clean") ?? null,
       beginRemoval: async (sandboxId) => (await resolve())?.beginRemoval(sandboxId),
       backUpWork: async (lease) => {
-        const token = (await resolve())?.config.provisioning?.githubToken;
+        const service = await resolve();
+        const token = service?.config.provisioning?.githubToken;
+        const target = async (repository: string | undefined) =>
+          workTarget({
+            originIsPrivate: await repositoryIsPrivate(repository, token),
+            token,
+            bundlePath: undefined,
+          });
         const devbox = await readyDevbox(lease.leaseId);
-        if (!devbox) throw new Error("The cloud box has no ready Devbox.");
-        const manifest = await manifests.load(devbox.operation.request.requestId);
-        return (await resolveNamespace()).runtime.backUpWork(
-          devbox.operation,
-          devbox.resource,
-          manifest,
+        if (devbox) {
+          const manifest = await manifests.load(devbox.operation.request.requestId);
+          return (await resolveNamespace()).runtime.backUpWork(
+            devbox.operation,
+            devbox.resource,
+            manifest,
+            { branch: lease.leaseId, target: await target(devbox.operation.request.repository) },
+          );
+        }
+        const box = await e2bBox(lease);
+        if (!box || !service) throw new Error("The cloud box has no ready machine.");
+        const manifest = await manifests.load(box.operation.request.requestId);
+        // Wakes the sandbox to push its work; the sweep puts it back to sleep or removes it.
+        return backUpWorkspace(
+          await e2bRuntime(service.config).guest(box.operation, box.sandboxId),
           {
+            root: manifest.preparation.root,
             branch: lease.leaseId,
-            target: workTarget({
-              originIsPrivate: await repositoryIsPrivate(
-                devbox.operation.request.repository,
-                token,
-              ),
-              token,
-              bundlePath: undefined,
-            }),
+            target: await target(box.operation.request.repository),
           },
         );
       },

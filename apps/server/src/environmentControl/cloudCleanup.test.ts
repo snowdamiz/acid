@@ -67,9 +67,18 @@ describe("cleanupPlan", () => {
       plan: { kind: "scheduled", at: "2026-03-08T12:00:00.000Z", reason: "idle" },
     },
     {
-      name: "never cleans an E2B sandbox",
+      name: "removes an idle paused E2B sandbox the cleanup days after its pause",
       input: { lease: withoutDevbox({ provider: "e2b" }), thread: null, afterDays: 7 },
-      plan: null,
+      plan: { kind: "scheduled", at: "2026-03-08T12:00:00.000Z", reason: "idle" },
+    },
+    {
+      name: "removes an E2B sandbox an hour after its chat settles",
+      input: {
+        lease: withoutDevbox({ provider: "e2b" }),
+        thread: settled("2026-03-02T00:00:00.000Z"),
+        afterDays: 7,
+      },
+      plan: { kind: "scheduled", at: "2026-03-02T01:00:00.000Z", reason: "settled" },
     },
     {
       name: "never cleans an instance-engine chat, which has no devbox",

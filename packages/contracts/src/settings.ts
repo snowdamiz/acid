@@ -1164,7 +1164,7 @@ export const StorageCleanupSettings = Schema.Struct({
     Schema.withDecodingDefault(Effect.succeed(null)),
   ),
   logsAfterDays: StorageRetentionDays.pipe(Schema.withDecodingDefault(Effect.succeed(null))),
-  /** Days a paused Namespace Devbox may sit unused before it is removed. Null keeps it. */
+  /** Days a paused Namespace Devbox or E2B sandbox may sit unused before it is removed. Null keeps it. */
   cloudMachinesAfterDays: StorageRetentionDays.pipe(Schema.withDecodingDefault(Effect.succeed(1))),
 });
 export type StorageCleanupSettings = typeof StorageCleanupSettings.Type;

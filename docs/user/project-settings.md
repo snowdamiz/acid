@@ -223,12 +223,11 @@ only, so Windows hosts keep these worktrees. Branches stay.
 Browser captures and rotated logs have separate retention periods. Expired capture links stop
 working. Current logs, message attachments, and browser profiles are kept.
 
-Some paused cloud machines keep billing for their disk. The host that runs one removes it after
-seven unused days, or an hour after it pauses once its chat is settled. Change the days or turn
-this off with **Remove unused cloud machines**. Before removal, unpushed work is pushed to
-`t3-backup/<id>` branches of the repository. A machine whose work can't be pushed is kept. Select
-**Keep** on a machine under **Settings → Connections** to exempt it. Machines that cost nothing
-while paused, such as E2B sandboxes, are never removed.
+The host that runs a paused Mac or E2B machine removes it after a day unused, or an hour after it
+pauses once its chat is settled. A chat settles on its own when its pull request merges or closes.
+Change the days or turn this off with **Remove unused cloud machines**. Before removal, unpushed
+work is pushed to `t3-backup/<id>` branches of the repository. A machine whose work can't be pushed
+is kept. Select **Keep** on a machine under **Settings → Connections** to exempt it.
 
 A Modal machine wakes with its processes still running. Modal keeps a paused machine's memory for
 seven days from its first pause. After that, or if Modal ends a machine while it runs, the machine
