@@ -54,7 +54,7 @@ import {
 } from "@t3tools/provider-core/server/failure";
 import * as RunExecutionService from "./RunExecutionService.ts";
 import * as RuntimePolicy from "./RuntimePolicy.ts";
-import { AUTOMATION_HOST_DRIVER_MESSAGE, localAgentRunsEnabled } from "./cloudOnlyHost.ts";
+import { AUTOMATION_HOST_DRIVER_MESSAGE, localAgentRunsEnabled } from "./hostMode.ts";
 import {
   isRestartNoteContinuation,
   pendingRestartCancelledBackgroundWork,

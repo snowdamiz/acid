@@ -53,7 +53,7 @@ import {
   LOCAL_AGENT_RUNS_DISABLED_MESSAGE,
   localAgentRunsEnabled,
   localAutomationRunsEnabled,
-} from "./cloudOnlyHost.ts";
+} from "./hostMode.ts";
 import * as ThreadManagement from "./ThreadManagementService.ts";
 
 export type ThreadLaunchWorkspaceStrategy =

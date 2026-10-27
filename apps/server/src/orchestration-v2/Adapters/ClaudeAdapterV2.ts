@@ -6,7 +6,7 @@ import {
   formatSearchToolLabel,
 } from "@t3tools/shared/toolActivity";
 import { field, text } from "../unknownField.ts";
-import { localAgentRunsEnabled } from "../cloudOnlyHost.ts";
+import { localAgentRunsEnabled } from "../hostMode.ts";
 import {
   initialWorkflowAgentTranscriptCursor,
   readWorkflowAgentTranscript,

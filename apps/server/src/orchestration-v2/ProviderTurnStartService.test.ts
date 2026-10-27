@@ -47,7 +47,7 @@ import * as ProjectionStore from "./ProjectionStore.ts";
 import * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
 import * as ProviderSessionManager from "./ProviderSessionManager.ts";
 import * as ProviderTurnStart from "./ProviderTurnStartService.ts";
-import { AUTOMATION_HOST_DRIVER_MESSAGE } from "./cloudOnlyHost.ts";
+import { AUTOMATION_HOST_DRIVER_MESSAGE } from "./hostMode.ts";
 import * as RunExecutionService from "./RunExecutionService.ts";
 import * as RuntimePolicy from "./RuntimePolicy.ts";
 
