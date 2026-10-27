@@ -555,6 +555,69 @@ export const NamespaceAccount = Schema.Union([
 ]);
 export type NamespaceAccount = typeof NamespaceAccount.Type;
 
+/**
+ * A path inside a home directory: relative, with no empty, `.` or `..` part, backslash or NUL. A
+ * machine's own T3 state lives under `.t3`, so nothing synced lands there.
+ */
+export const HomeRelativePath = TrimmedNonEmptyString.check(
+  Schema.makeFilter(
+    (path) =>
+      !path.startsWith("/") &&
+      !path.includes("\\") &&
+      !path.includes("\0") &&
+      path.split("/").every((part) => part !== "" && part !== "." && part !== "..") &&
+      path.split("/")[0] !== ".t3",
+  ),
+);
+
+export const HomeFile = Schema.Struct({
+  path: HomeRelativePath,
+  contentsBase64: Schema.String,
+  /** Permission bits; 0600 when absent, since these are credentials. */
+  mode: Schema.optional(Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 0o777 }))),
+});
+export type HomeFile = typeof HomeFile.Type;
+
+/**
+ * The whole set of files a host keeps in one of its cloud machines' home. The machine removes
+ * what an earlier set wrote and this one leaves out.
+ */
+export const WriteHomeFilesInput = Schema.Struct({ files: Schema.Array(HomeFile) });
+export type WriteHomeFilesInput = typeof WriteHomeFilesInput.Type;
+
+export const WriteHomeFilesResult = Schema.Struct({
+  written: NonNegativeInt,
+  removed: NonNegativeInt,
+});
+export type WriteHomeFilesResult = typeof WriteHomeFilesResult.Type;
+
+/**
+ * The CLI logins a user's computer keeps on this host (`t3 sessions`), which it writes into every
+ * cloud machine. Clients see only paths and sizes.
+ */
+export const CloudSessionFiles = Schema.Struct({
+  device: Schema.NullOr(Schema.String),
+  syncedAt: Schema.NullOr(Schema.String),
+  files: Schema.Array(Schema.Struct({ path: HomeRelativePath, bytes: NonNegativeInt })),
+});
+export type CloudSessionFiles = typeof CloudSessionFiles.Type;
+
+/** CLI logins are small, and every cloud machine that wakes is sent all of them. */
+export const MAX_SESSION_FILES_BYTES = 5 * 1024 * 1024;
+
+/** What `t3 sessions push` sends: the whole set its computer syncs, replacing the last one. */
+export const CloudSessionFilesUpload = Schema.Struct({
+  device: TrimmedNonEmptyString,
+  files: Schema.Array(HomeFile).check(
+    Schema.makeFilter(
+      (files) =>
+        files.reduce((total, file) => total + (file.contentsBase64.length * 3) / 4, 0) <=
+          MAX_SESSION_FILES_BYTES || "Synced files may total at most 5 MiB.",
+    ),
+  ),
+});
+export type CloudSessionFilesUpload = typeof CloudSessionFilesUpload.Type;
+
 /** Keeps a cloud machine from automatic cleanup, or allows it again. */
 export const EnvironmentProvisionKeepInput = Schema.Struct({
   requestId: ProvisionRequestId,

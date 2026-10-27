@@ -17,6 +17,8 @@ import {
   type EnvironmentControlPresenceInput,
   type EnvironmentControlPresenceResult,
   type NamespaceAccount,
+  type CloudSessionFiles,
+  type CloudSessionFilesUpload,
   type EnvironmentProvisionAttachInput,
   type EnvironmentProvisionAttachResult,
   type EnvironmentProvisionInput,
@@ -89,6 +91,7 @@ import { makeProvisionControl } from "./ProvisionControl.ts";
 import { deliverFirstTurn } from "./firstTurn.ts";
 import { makeNamespaceAllocationPorts } from "./namespaceAllocation.ts";
 import { makeNamespaceLogin } from "./namespaceLogin.ts";
+import { makeSessionFileSync, sendHomeFiles } from "./sessionFileSync.ts";
 import {
   makeNamespaceAccountSession,
   makeNamespaceProvisionRuntime,
@@ -174,6 +177,7 @@ import {
   type BoxBackupResult,
 } from "./boxBackup.ts";
 import { BoxUsageStore } from "../usage/boxUsage.ts";
+import { backUpWorkspace } from "./workspaceBackup.ts";
 
 const isProvisionRequestId = Schema.is(ProvisionRequestId);
 
@@ -1427,6 +1431,13 @@ export class EnvironmentControl extends Context.Service<
     readonly namespaceAccount: Effect.Effect<NamespaceAccount, EnvironmentControlError>;
     /** Starts a browser sign-in to Namespace, or answers with the one waiting for the user. */
     readonly namespaceSignIn: Effect.Effect<NamespaceAccount, EnvironmentControlError>;
+    /** The CLI logins a computer syncs here, which every awake cloud machine is given. */
+    readonly sessionFiles: Effect.Effect<CloudSessionFiles, EnvironmentControlError>;
+    readonly uploadSessionFiles: (
+      input: CloudSessionFilesUpload,
+    ) => Effect.Effect<CloudSessionFiles, EnvironmentControlError>;
+    /** Forgets the synced logins and removes them from every cloud machine as it is next awake. */
+    readonly clearSessionFiles: Effect.Effect<CloudSessionFiles, EnvironmentControlError>;
   }
 >()("t3/environmentControl/EnvironmentControl") {}
 
@@ -1830,6 +1841,26 @@ export const layer = Layer.effect(
       },
     });
     yield* Effect.addFinalizer(() => Effect.sync(namespaceLogin.close));
+    const sessionFiles = makeSessionFileSync({
+      path: NodePath.join(secretsDir, "cloud-session-files.bin"),
+      awake: () => leaseRegistry.awake(),
+      send: sendHomeFiles,
+      onError: (lease, cause) =>
+        void runLogged(
+          Effect.logWarning("synced CLI logins could not be written to a cloud machine", {
+            leaseId: lease.leaseId,
+            cause,
+          }),
+        ),
+    });
+    yield* Effect.tryPromise(sessionFiles.sync).pipe(
+      Effect.ignore({
+        log: "Warn",
+        message: "synced CLI logins could not be kept on cloud machines",
+      }),
+      Effect.repeat(Schedule.spaced(Duration.seconds(15))),
+      Effect.forkScoped,
+    );
     const resolveNamespace = () => {
       namespace ??= (async () => {
         const manager = await resolve();
@@ -2832,10 +2863,10 @@ export const layer = Layer.effect(
           ),
         );
     /**
-     * Removes paused Devboxes past their cleanup time, through the same cancel a user's delete
-     * takes. Their work is pushed with the configured GitHub token, which reaches the guest only
-     * on the backup script's stdin. Each step resolves the current service, so the sweep takes
-     * the same per-box lock a client's resume does.
+     * Removes paused Devboxes and E2B sandboxes past their cleanup time, through the same cancel
+     * a user's delete takes. Their work is pushed with the configured GitHub token, which reaches
+     * the guest only on the backup script's stdin. Each step resolves the current service, so the
+     * sweep takes the same per-box lock a client's resume does.
      */
     const cleanUpPausedBoxes = createCleanupSweep({
       now: () => Date.now(),
@@ -2843,7 +2874,7 @@ export const layer = Layer.effect(
       candidates: async () => {
         const candidates: Array<CleanupCandidate> = [];
         for (const lease of await leaseRegistry.paused())
-          if (lease.namespaceResource && (await readyDevbox(lease.leaseId)))
+          if (lease.namespaceResource ? await readyDevbox(lease.leaseId) : await e2bBox(lease))
             candidates.push(await cleanupCandidate(lease));
         return candidates;
       },
@@ -2854,24 +2885,34 @@ export const layer = Layer.effect(
       holdBox: async (sandboxId) => (await resolve())?.holdBox(sandboxId, "clean") ?? null,
       beginRemoval: async (sandboxId) => (await resolve())?.beginRemoval(sandboxId),
       backUpWork: async (lease) => {
-        const token = (await resolve())?.config.provisioning?.githubToken;
+        const service = await resolve();
+        const token = service?.config.provisioning?.githubToken;
+        const target = async (repository: string | undefined) =>
+          workTarget({
+            originIsPrivate: await repositoryIsPrivate(repository, token),
+            token,
+            bundlePath: undefined,
+          });
         const devbox = await readyDevbox(lease.leaseId);
-        if (!devbox) throw new Error("The cloud box has no ready Devbox.");
-        const manifest = await manifests.load(devbox.operation.request.requestId);
-        return (await resolveNamespace()).runtime.backUpWork(
-          devbox.operation,
-          devbox.resource,
-          manifest,
+        if (devbox) {
+          const manifest = await manifests.load(devbox.operation.request.requestId);
+          return (await resolveNamespace()).runtime.backUpWork(
+            devbox.operation,
+            devbox.resource,
+            manifest,
+            { branch: lease.leaseId, target: await target(devbox.operation.request.repository) },
+          );
+        }
+        const box = await e2bBox(lease);
+        if (!box || !service) throw new Error("The cloud box has no ready machine.");
+        const manifest = await manifests.load(box.operation.request.requestId);
+        // Wakes the sandbox to push its work; the sweep puts it back to sleep or removes it.
+        return backUpWorkspace(
+          await e2bRuntime(service.config).guest(box.operation, box.sandboxId),
           {
+            root: manifest.preparation.root,
             branch: lease.leaseId,
-            target: workTarget({
-              originIsPrivate: await repositoryIsPrivate(
-                devbox.operation.request.repository,
-                token,
-              ),
-              token,
-              bundlePath: undefined,
-            }),
+            target: await target(box.operation.request.repository),
           },
         );
       },
@@ -3357,6 +3398,22 @@ export const layer = Layer.effect(
         try: namespaceLogin.signIn,
         catch: () =>
           new EnvironmentControlError({ message: "The Namespace sign-in could not start." }),
+      }),
+      sessionFiles: Effect.tryPromise({
+        try: sessionFiles.read,
+        catch: () =>
+          new EnvironmentControlError({ message: "The synced CLI logins could not be read." }),
+      }),
+      uploadSessionFiles: (input) =>
+        Effect.tryPromise({
+          try: () => sessionFiles.upload(input),
+          catch: () =>
+            new EnvironmentControlError({ message: "The synced CLI logins could not be saved." }),
+        }),
+      clearSessionFiles: Effect.tryPromise({
+        try: sessionFiles.clear,
+        catch: () =>
+          new EnvironmentControlError({ message: "The synced CLI logins could not be cleared." }),
       }),
       touch: (input) =>
         importedLeases.has(input.leaseId)

@@ -126,6 +126,30 @@ describe("command permissions", () => {
     ),
   );
 
+  it.effect("requires the destination settings grant to clear synced CLI logins", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const registry = yield* setup;
+        const clear = createCommandPermissions(
+          runtime,
+          WS_METHODS.environmentControlClearSessionFiles,
+        );
+        registry.set(sessions(env), AsyncResult.success(grant(true)));
+        expect(registry.get(clear.permissionAtom(env))).toBe(false);
+        registry.set(
+          sessions(env),
+          AsyncResult.success({
+            ...grant(true),
+            scopes: [AuthSettingsWriteScope],
+            permissions: [AuthSettingsWriteScope],
+          }),
+        );
+        expect(registry.get(clear.permissionAtom(env))).toBe(true);
+        yield* clear.authorize(registry, env);
+      }),
+    ),
+  );
+
   it.effect("uses the target grant for both availability and execution", () =>
     Effect.scoped(
       Effect.gen(function* () {

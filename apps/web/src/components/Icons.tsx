@@ -9,6 +9,23 @@ export const UltrafastIcon: Icon = (props) => (
   </svg>
 );
 
+export const PotatoIcon: Icon = (props) => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    {...props}
+  >
+    <path d="M7.6 4.6c2.2-1.6 5.4-1.9 8-.9 3.3 1.3 5 4.6 4.4 8.2-.6 3.6-2.9 6.9-6.5 7.8-3.3.9-7.4.2-9.3-2.9-1.6-2.6-.8-5.4.5-7.7.9-1.6 1.6-3.3 2.9-4.5Z" />
+    <path d="M9 9h.01" />
+    <path d="M14.5 8h.01" />
+    <path d="M13 14.5h.01" />
+  </svg>
+);
+
 export const FinderIcon: Icon = (props) => (
   <svg viewBox="0 0 24 24" fill="none" {...props}>
     <rect x="2" y="2" width="20" height="20" rx="4" fill="#36A9F5" />

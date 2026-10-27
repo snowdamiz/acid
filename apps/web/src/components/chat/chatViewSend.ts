@@ -35,6 +35,7 @@ import type { ProviderInstanceEntry } from "../../providerInstances";
 import { getComposerPromptInjectionState, getComposerProviderState } from "./composerProviderState";
 import {
   formatOutgoingPrompt,
+  potetoModeInvocation,
   getAntigravitySendBlockReason,
   resolveComposerInteractionMode,
   cloneComposerImageForRetry,
@@ -287,6 +288,8 @@ export function resolveMultipleModelTargets(input: {
   readonly providerInstanceEntries: ReadonlyArray<ProviderInstanceEntry>;
   readonly messageText: string;
   readonly planModeEnabled: boolean;
+  /** Each new thread starts with poteto mode's skill, on the models whose agent has it. */
+  readonly potetoMode: boolean;
   readonly interactionMode: ProviderInteractionMode;
 }): Array<MultipleModelTarget | { readonly error: string }> {
   const { messageText, planModeEnabled } = input;
@@ -319,6 +322,9 @@ export function resolveMultipleModelTargets(input: {
         models: provider.models,
         effort: providerState.promptEffort,
         text: messageText || ATTACHMENT_ONLY_BOOTSTRAP_PROMPT,
+        leadingSkill: input.potetoMode
+          ? potetoModeInvocation(provider.driverKind, provider.snapshot.skills)
+          : null,
       }),
       interactionMode: resolveComposerInteractionMode({
         planModeEnabled,

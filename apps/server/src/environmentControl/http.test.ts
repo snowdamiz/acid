@@ -3,8 +3,10 @@ import * as NodeHttpServer from "@effect/platform-node/NodeHttpServer";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { expect, it } from "@effect/vitest";
 import {
+  AuthEnvironmentMaintainScope,
   AuthOrchestrationOperateScope,
   AuthOrchestrationReadScope,
+  type AuthEnvironmentScope,
   AuthSessionId,
   CommandId,
   EnvironmentAuthenticatedAuth,
@@ -40,26 +42,32 @@ import * as ProviderAccountSwitch from "../provider/ProviderAccountSwitch.ts";
 import * as ServerRuntimeStartup from "../serverRuntimeStartup.ts";
 import { EnvironmentControl } from "./EnvironmentControl.ts";
 import { environmentControlBodyLimitLayer, environmentControlHttpApiLayer } from "./http.ts";
+import { PROVISION_BROKER_SUBJECT } from "./remotePreparation.ts";
 
 class ProvisionHttpApi extends HttpApi.make("environment").add(EnvironmentControlHttpApi) {}
 
 const encodeJson = Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown));
 const decodeJson = Schema.decodeUnknownEffect(Schema.fromJsonString(Schema.Unknown));
 
+const principals: Record<string, { subject: string; scope: AuthEnvironmentScope }> = {
+  "Bearer operator": { subject: "proof", scope: AuthOrchestrationOperateScope },
+  "Bearer reader": { subject: "proof", scope: AuthOrchestrationReadScope },
+  "Bearer maintainer": { subject: "proof", scope: AuthEnvironmentMaintainScope },
+  "Bearer broker": { subject: PROVISION_BROKER_SUBJECT, scope: AuthEnvironmentMaintainScope },
+};
+
 const auth = Layer.succeed(EnvironmentAuthenticatedAuth, (effect) =>
   Effect.gen(function* () {
     const request = yield* HttpServerRequest.HttpServerRequest;
-    const token = request.headers.authorization;
-    if (token !== "Bearer operator" && token !== "Bearer reader") {
+    const principal = principals[request.headers.authorization ?? ""];
+    if (!principal) {
       return yield* failEnvironmentAuthInvalid("missing_credential");
     }
     return yield* Effect.provideService(effect, EnvironmentAuthenticatedPrincipal, {
       sessionId: AuthSessionId.make("provision-http-proof"),
-      subject: "proof",
+      subject: principal.subject,
       method: "bearer-access-token",
-      scopes: new Set([
-        token === "Bearer operator" ? AuthOrchestrationOperateScope : AuthOrchestrationReadScope,
-      ]),
+      scopes: new Set([principal.scope]),
     });
   }),
 );
@@ -92,6 +100,9 @@ it.effect(
           presence: () => Effect.die("Unused in provision HTTP proof"),
           namespaceAccount: Effect.die("Unused in provision HTTP proof"),
           namespaceSignIn: Effect.die("Unused in provision HTTP proof"),
+          sessionFiles: Effect.die("Unused in provision HTTP proof"),
+          uploadSessionFiles: () => Effect.die("Unused in provision HTTP proof"),
+          clearSessionFiles: Effect.die("Unused in provision HTTP proof"),
           provision: (input) =>
             Effect.sync(() => {
               calls.push({ method: "provision", input });
@@ -224,6 +235,43 @@ it.effect(
         expect(calls).toHaveLength(6);
       }).pipe(Effect.provide(http), Effect.scoped);
     }),
+);
+
+it.effect("only a box's host writes synced files into the box's home", () =>
+  Effect.gen(function* () {
+    const routes = HttpApiBuilder.layer(ProvisionHttpApi).pipe(
+      Layer.provide(environmentControlHttpApiLayer),
+      Layer.provide(
+        Layer.mergeAll(
+          Layer.mock(EnvironmentControl)({}),
+          Layer.mock(ServerRuntimeStartup.ServerRuntimeStartup)({}),
+          Layer.mock(ThreadLaunchService.ThreadLaunchService)({}),
+          Layer.mock(ThreadManagementService.ThreadManagementService)({}),
+          Layer.mock(ProviderAccountSwitch.ProviderAccountSwitch)({}),
+          ServerConfig.layerTest(process.cwd(), { prefix: "t3-home-files-http-" }),
+        ).pipe(Layer.provideMerge(NodeServices.layer)),
+      ),
+      Layer.provide(auth),
+    );
+    const http = HttpRouter.serve(routes, { disableListenLog: true, disableLogger: true }).pipe(
+      Layer.provideMerge(NodeHttpServer.layerTest),
+    );
+    yield* Effect.gen(function* () {
+      const client = yield* HttpClient.HttpClient;
+      const write = Effect.fnUntraced(function* (credential: string) {
+        const request = HttpClientRequest.post("/api/environment-control/home-files").pipe(
+          HttpClientRequest.setHeader("authorization", `Bearer ${credential}`),
+          // An empty set touches only the server's own record, never this test's home.
+          HttpClientRequest.bodyText(yield* encodeJson({ files: [] }), "application/json"),
+        );
+        const response = yield* client.execute(request);
+        const text = yield* response.text;
+        return { status: response.status, body: text ? yield* decodeJson(text) : null };
+      });
+      expect((yield* write("maintainer")).status).toBe(403);
+      expect(yield* write("broker")).toEqual({ status: 200, body: { written: 0, removed: 0 } });
+    }).pipe(Effect.provide(http), Effect.scoped);
+  }),
 );
 
 it.effect("the launch-thread route checks scope and tells a refused launch from a failed one", () =>

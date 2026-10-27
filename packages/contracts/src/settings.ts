@@ -444,6 +444,8 @@ export const ClientSettingsSchema = Schema.Struct({
   ),
   proactivePanelsEnabled: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
   showSkillsInSlashMenu: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(true))),
+  /** Starts each thread's first prompt with pstack's poteto-mode skill, when its agent has it. */
+  potetoMode: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
   legacySidebarEnabled: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
   sidebarWorkingShelfEnabled: Schema.Boolean.pipe(
     Schema.withDecodingDefault(Effect.succeed(false)),
@@ -1162,7 +1164,7 @@ export const StorageCleanupSettings = Schema.Struct({
     Schema.withDecodingDefault(Effect.succeed(null)),
   ),
   logsAfterDays: StorageRetentionDays.pipe(Schema.withDecodingDefault(Effect.succeed(null))),
-  /** Days a paused Namespace Devbox may sit unused before it is removed. Null keeps it. */
+  /** Days a paused Namespace Devbox or E2B sandbox may sit unused before it is removed. Null keeps it. */
   cloudMachinesAfterDays: StorageRetentionDays.pipe(Schema.withDecodingDefault(Effect.succeed(1))),
 });
 export type StorageCleanupSettings = typeof StorageCleanupSettings.Type;
@@ -1371,8 +1373,9 @@ export const ServerSettings = Schema.Struct({
   observability: ObservabilitySettings.pipe(Schema.withDecodingDefault(Effect.succeed({}))),
   cloudCredentials: CloudCredentialsSettings.pipe(Schema.withDecodingDefault(Effect.succeed({}))),
   /**
-   * A public HTTPS origin that forwards `/api/hooks/*` to this server, such as a tunnel. Webhook
-   * tasks report their URL on it, before the T3 Connect relay's.
+   * A public HTTPS URL that forwards `<its path>/api/hooks/*` to this server, such as a tunnel or a
+   * front serving several servers under their own paths. Webhook tasks report their URL under it,
+   * before the T3 Connect relay's.
    */
   publicWebhookOrigin: TrimmedString.pipe(Schema.withDecodingDefault(Effect.succeed(""))),
   sourceControlHosts: Schema.Record(Schema.String, SourceControlHostSettings).pipe(
@@ -1828,6 +1831,7 @@ export const ClientSettingsPatch = Schema.Struct({
   followUpBehavior: Schema.optionalKey(Schema.Literals(["queue", "steer"])),
   proactivePanelsEnabled: Schema.optionalKey(Schema.Boolean),
   showSkillsInSlashMenu: Schema.optionalKey(Schema.Boolean),
+  potetoMode: Schema.optionalKey(Schema.Boolean),
   legacySidebarEnabled: Schema.optionalKey(Schema.Boolean),
   sidebarWorkingShelfEnabled: Schema.optionalKey(Schema.Boolean),
   sidebarProjectGroupingMode: Schema.optionalKey(SidebarProjectGroupingMode),

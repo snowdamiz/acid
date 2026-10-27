@@ -40,6 +40,7 @@ import {
   EnvironmentProvisionRestoreInput,
   EnvironmentProvisionRestoreResult,
   NamespaceAccount,
+  CloudSessionFiles,
 } from "./environmentControl.ts";
 
 export const ENVIRONMENT_CONTROL_WS_METHODS = {
@@ -61,6 +62,8 @@ export const ENVIRONMENT_CONTROL_WS_METHODS = {
   environmentControlPresence: "environmentControl.presence",
   environmentControlNamespaceAccount: "environmentControl.namespaceAccount",
   environmentControlNamespaceSignIn: "environmentControl.namespaceSignIn",
+  environmentControlSessionFiles: "environmentControl.sessionFiles",
+  environmentControlClearSessionFiles: "environmentControl.clearSessionFiles",
 } as const;
 
 const EnvironmentControlListRpc = Rpc.make(ENVIRONMENT_CONTROL_WS_METHODS.environmentControlList, {
@@ -223,6 +226,23 @@ const EnvironmentControlNamespaceSignInRpc = Rpc.make(
   },
 );
 
+const EnvironmentControlSessionFilesRpc = Rpc.make(
+  ENVIRONMENT_CONTROL_WS_METHODS.environmentControlSessionFiles,
+  {
+    payload: Schema.Struct({}),
+    success: CloudSessionFiles,
+    error: Schema.Union([EnvironmentAuthorizationError, EnvironmentControlError]),
+  },
+);
+const EnvironmentControlClearSessionFilesRpc = Rpc.make(
+  ENVIRONMENT_CONTROL_WS_METHODS.environmentControlClearSessionFiles,
+  {
+    payload: Schema.Struct({}),
+    success: CloudSessionFiles,
+    error: Schema.Union([EnvironmentAuthorizationError, EnvironmentControlError]),
+  },
+);
+
 export const EnvironmentControlRpcs = [
   EnvironmentControlListRpc,
   EnvironmentControlListProvisionedRpc,
@@ -242,4 +262,6 @@ export const EnvironmentControlRpcs = [
   EnvironmentControlPresenceRpc,
   EnvironmentControlNamespaceAccountRpc,
   EnvironmentControlNamespaceSignInRpc,
+  EnvironmentControlSessionFilesRpc,
+  EnvironmentControlClearSessionFilesRpc,
 ] as const;

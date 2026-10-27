@@ -7,7 +7,8 @@ import {
 
 /**
  * Cloud machine RPCs: reading the list needs read scope, anything that runs or changes one operate.
- * Signing the host in to Namespace changes the account its Macs bill to, which is a setting.
+ * Signing the host in to Namespace changes the account its Macs bill to, which is a setting, as
+ * the CLI logins every machine is given are.
  */
 export const ENVIRONMENT_CONTROL_REQUIRED_SCOPES = {
   [WS_METHODS.environmentControlListProvisioned]: AuthOrchestrationReadScope,
@@ -28,4 +29,6 @@ export const ENVIRONMENT_CONTROL_REQUIRED_SCOPES = {
   [WS_METHODS.environmentControlPresence]: AuthOrchestrationOperateScope,
   [WS_METHODS.environmentControlNamespaceAccount]: AuthOrchestrationReadScope,
   [WS_METHODS.environmentControlNamespaceSignIn]: AuthSettingsWriteScope,
+  [WS_METHODS.environmentControlSessionFiles]: AuthOrchestrationReadScope,
+  [WS_METHODS.environmentControlClearSessionFiles]: AuthSettingsWriteScope,
 } as const;

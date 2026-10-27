@@ -55,4 +55,6 @@ export const environmentControlWsHandlers = (environmentControl: EnvironmentCont
     [WS_METHODS.environmentControlPresence]: (input) => environmentControl.presence(input),
     [WS_METHODS.environmentControlNamespaceAccount]: () => environmentControl.namespaceAccount,
     [WS_METHODS.environmentControlNamespaceSignIn]: () => environmentControl.namespaceSignIn,
+    [WS_METHODS.environmentControlSessionFiles]: () => environmentControl.sessionFiles,
+    [WS_METHODS.environmentControlClearSessionFiles]: () => environmentControl.clearSessionFiles,
   }) satisfies RpcGroup.HandlersFrom<(typeof EnvironmentControlRpcs)[number]>;

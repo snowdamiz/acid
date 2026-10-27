@@ -9,7 +9,9 @@ import { BotIcon, PencilRulerIcon } from "lucide-react";
 import { type ComponentProps, memo } from "react";
 
 import type { ContextWindowSnapshot } from "../../lib/contextWindow";
+import { PotatoIcon } from "../Icons";
 import { Select, SelectItem, SelectPopup, SelectValue } from "../ui/select";
+import { Switch } from "../ui/switch";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import {
   ComposerControl,
@@ -26,6 +28,8 @@ import { runtimeModeConfig } from "./runtimeModeConfig";
 import { useComposerMenuState } from "./useComposerMenuState";
 
 export type RuntimeModeOption = { mode: RuntimeMode } & (typeof runtimeModeConfig)[RuntimeMode];
+/** Poteto mode's switch, offered only while the selected agent has pstack's poteto-mode skill. */
+export type PotetoModeControl = { readonly enabled: boolean; readonly onToggle: () => void };
 const supervisedRuntimeModeOption = {
   mode: "approval-required" as const,
   ...runtimeModeConfig["approval-required"],
@@ -35,6 +39,7 @@ export const ComposerFooterModeControls = memo(function ComposerFooterModeContro
   interactionMode: ProviderInteractionMode;
   runtimeMode: RuntimeMode;
   runtimeModeOptions: ReadonlyArray<RuntimeModeOption>;
+  potetoMode: PotetoModeControl | null;
   size?: "sm" | "xs";
   hidden?: boolean;
   onToggleInteractionMode: () => void;
@@ -42,6 +47,9 @@ export const ComposerFooterModeControls = memo(function ComposerFooterModeContro
 }) {
   const size = props.size ?? "sm";
   const composerFloatingLayerProps = useComposerMenuProps();
+  const potetoModeTooltip = props.potetoMode?.enabled
+    ? "Poteto mode on: a new thread starts with pstack's poteto-mode skill"
+    : "Poteto mode off";
   const [open, setOpen] = useComposerMenuState(props.hidden);
   const runtimeModeOption =
     props.runtimeModeOptions.find((option) => option.mode === props.runtimeMode) ??
@@ -141,6 +149,30 @@ export const ComposerFooterModeControls = memo(function ComposerFooterModeContro
         </Select>
         <TooltipPopup side="top">{runtimeModeOption.description}</TooltipPopup>
       </Tooltip>
+
+      {props.potetoMode ? (
+        <>
+          <ComposerControlSeparator size={size} />
+          <Tooltip>
+            <TooltipTrigger
+              render={<label className="flex shrink-0 cursor-pointer items-center gap-1.5 px-1" />}
+            >
+              <ComposerControlIcon
+                icon={PotatoIcon}
+                size={size}
+                className={props.potetoMode.enabled ? "text-current opacity-100" : undefined}
+              />
+              <Switch
+                size="sm"
+                checked={props.potetoMode.enabled}
+                onCheckedChange={props.potetoMode.onToggle}
+                aria-label="Poteto mode"
+              />
+            </TooltipTrigger>
+            <TooltipPopup side="top">{potetoModeTooltip}</TooltipPopup>
+          </Tooltip>
+        </>
+      ) : null}
 
       {interactionModeToggle}
     </>

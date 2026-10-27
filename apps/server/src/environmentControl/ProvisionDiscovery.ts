@@ -14,7 +14,7 @@ import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import type * as SqlClient from "effect/sql/SqlClient";
 import { isLoopbackHostname } from "../http.ts";
-import { cleanupPlan } from "./cloudCleanup.ts";
+import { cleansUp, cleanupPlan } from "./cloudCleanup.ts";
 import { ProvisionedChatJson } from "./provisionedChats.ts";
 import { restorableUntil, StoredProvisionedLease } from "./ProvisionedLeaseRegistry.ts";
 
@@ -193,7 +193,7 @@ export const listProvisionedEnvironments = Effect.fn("ProvisionDiscovery.list")(
         (lease.owner !== null && lease.owner.environmentId !== box.environmentId)
       )
         continue;
-      // Only a chat newer than the client's, or one a paused Devbox's cleanup reads, is decoded.
+      // Only a chat newer than the client's, or one a paused machine's cleanup reads, is decoded.
       // One that no longer decodes is left out rather than failing the list.
       const sendChat =
         heldChats !== undefined &&
@@ -201,8 +201,7 @@ export const listProvisionedEnvironments = Effect.fn("ProvisionDiscovery.list")(
         box.lifecycle !== "disposed" &&
         (heldChats.get(box.environmentId) ?? -1) < chatSequence;
       const stored =
-        chatJson !== null &&
-        (sendChat || (lease.state === "paused" && lease.namespaceResource !== undefined))
+        chatJson !== null && (sendChat || (lease.state === "paused" && cleansUp(lease)))
           ? decodeChat(chatJson)
           : undefined;
       const owned =

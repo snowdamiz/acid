@@ -54,6 +54,8 @@ import {
   hasServerAcknowledgedLocalDispatch,
   resolveDraftPromotionNavigationTarget,
   waitForRevertedMessage,
+  formatOutgoingPrompt,
+  potetoModeInvocation,
 } from "./ChatView.logic";
 
 const environmentId = EnvironmentId.make("environment-local");
@@ -104,6 +106,36 @@ const readySession = {
   lastError: null,
   updatedAt: "2026-03-29T00:00:10.000Z",
 };
+
+describe("poteto mode", () => {
+  const claude = ProviderDriverKind.make("claudeAgent");
+  const codex = ProviderDriverKind.make("codex");
+
+  it("invokes pstack's skill as each agent does, by its bare name, only where it is listed", () => {
+    expect(potetoModeInvocation(claude, [{ name: "pstack:poteto-mode" }])).toBe("/poteto-mode");
+    expect(potetoModeInvocation(claude, [{ name: "poteto-mode" }])).toBe("/poteto-mode");
+    expect(potetoModeInvocation(codex, [{ name: "poteto-mode" }])).toBe("$poteto-mode");
+    expect(potetoModeInvocation(claude, [{ name: "poteto-mode-extra" }])).toBeNull();
+    expect(
+      potetoModeInvocation(ProviderDriverKind.make("cursor"), [{ name: "poteto-mode" }]),
+    ).toBeNull();
+  });
+
+  it("leads the prompt with the skill, unless the prompt opens with its own command or skill", () => {
+    const send = (text: string) =>
+      formatOutgoingPrompt({
+        provider: claude,
+        model: null,
+        models: [],
+        effort: null,
+        text,
+        leadingSkill: "/poteto-mode",
+      });
+    expect(send("Fix the flaky test")).toBe("/poteto-mode Fix the flaky test");
+    expect(send("/review the diff")).toBe("/review the diff");
+    expect(send("$deslop this file")).toBe("$deslop this file");
+  });
+});
 
 describe("resolveDraftPromotionNavigationTarget", () => {
   const serverThreadRef = { environmentId, threadId };

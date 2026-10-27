@@ -19,9 +19,13 @@ import {
   EnvironmentProvisionResult,
   EnvironmentProvisionTouchInput,
   EnvironmentProvisionTouchResult,
+  CloudSessionFiles,
+  CloudSessionFilesUpload,
   GuestAccountSwitchInput,
   GuestAccountSwitchResult,
   ProvisionedEnvironmentList,
+  WriteHomeFilesInput,
+  WriteHomeFilesResult,
 } from "./environmentControl.ts";
 import type {
   EnvironmentAuthenticatedAuth,
@@ -118,6 +122,25 @@ export function makeEnvironmentCloudHttpApis<
         payload: GuestAccountSwitchInput,
         success: GuestAccountSwitchResult,
         error: scopedErrors,
+      }).middleware(shared.auth),
+    )
+    .add(
+      // A host keeps the CLI logins its user syncs in each of its boxes. Only the box's host, with
+      // its broker token, writes there; a box that predates it answers 404.
+      HttpApiEndpoint.post("writeHomeFiles", "/api/environment-control/home-files", {
+        headers: shared.bearerHeaders,
+        payload: WriteHomeFilesInput,
+        success: WriteHomeFilesResult,
+        error: scopedErrors,
+      }).middleware(shared.auth),
+    )
+    .add(
+      // `t3 sessions push` replaces the CLI logins this host writes into its cloud machines.
+      HttpApiEndpoint.put("uploadSessionFiles", "/api/environment-control/session-files", {
+        headers: shared.bearerHeaders,
+        payload: CloudSessionFilesUpload,
+        success: CloudSessionFiles,
+        error: launchErrors,
       }).middleware(shared.auth),
     )
     .add(

@@ -1380,16 +1380,45 @@ export function mergeDirectPreviewAnnotation(input: {
 
 export { isThreadWokeUnseen } from "@t3tools/client-runtime/state/thread-settled";
 
+const POTETO_MODE_SKILL = "poteto-mode";
+
+/**
+ * How `provider` invokes pstack's poteto-mode skill, or null when it lists no such skill. Claude
+ * resolves the pstack plugin's `pstack:poteto-mode` by its bare name too, and a cloud machine has
+ * the skill under that name, so one invocation serves both.
+ */
+export function potetoModeInvocation(
+  provider: ProviderDriverKind,
+  skills: ReadonlyArray<Pick<ServerProvider["skills"][number], "name">>,
+): string | null {
+  const listed = skills.some(
+    (skill) => skill.name === POTETO_MODE_SKILL || skill.name.endsWith(`:${POTETO_MODE_SKILL}`),
+  );
+  if (!listed) return null;
+  if (provider === "claudeAgent") return `/${POTETO_MODE_SKILL}`;
+  if (provider === "codex") return `$${POTETO_MODE_SKILL}`;
+  return null;
+}
+
 export function formatOutgoingPrompt(params: {
   provider: ProviderDriverKind;
   model: string | null;
   models: ReadonlyArray<ServerProvider["models"][number]>;
   effort: string | null;
   text: string;
+  /**
+   * A skill the message invokes first, such as poteto mode's on a thread's first prompt. A prompt
+   * that opens with its own command or skill keeps it.
+   */
+  leadingSkill?: string | null;
 }): string {
   const caps = getProviderModelCapabilities(params.models, params.model, params.provider);
   const promptEffort = resolvePromptInjectedEffort(caps, params.effort);
-  return applyClaudePromptEffortPrefix(params.text, promptEffort);
+  const body = applyClaudePromptEffortPrefix(params.text, promptEffort);
+  // A skill runs only as the message's first word.
+  return params.leadingSkill && !/^[/$]/.test(params.text.trimStart())
+    ? `${params.leadingSkill} ${body}`
+    : body;
 }
 
 export function isCompactCommandMessage(message: ChatMessage): boolean {

@@ -8,6 +8,7 @@ import {
   revokeUserMessagePreviewUrls,
   boundAttachmentIds,
   formatOutgoingPrompt,
+  threadShellHasStarted,
   optimisticMessageAttachments,
   planComposerTurn,
   sendTitleFallbackLabels,
@@ -140,6 +141,7 @@ import { type useCloudChat, withHeldCloudSend } from "../../cloud/useCloudChat";
 const ENVIRONMENT_UNAVAILABLE_SEND_TOAST_TRAIL_SIZE = 3;
 
 const selectPlanModeEnabled = (settings: UnifiedSettings) => settings.planModeEnabled;
+const selectPotetoMode = (settings: UnifiedSettings) => settings.potetoMode;
 
 function readEnvironmentPresentation(environmentId: EnvironmentId) {
   return appAtomRegistry.get(environmentPresentations.presentationsAtom).get(environmentId);
@@ -326,6 +328,7 @@ export function useComposerSend(input: ComposerSendInput) {
   const navigate = useNavigate();
   const clientSettingsHydrated = useClientSettingsHydrated();
   const planModeEnabled = useEnvironmentSettings(environmentId, selectPlanModeEnabled);
+  const potetoMode = useEnvironmentSettings(environmentId, selectPotetoMode);
   const startThreadTurn = useOrchestrationCommand(threadEnvironment.startTurn, {
     reportFailure: false,
   });
@@ -533,6 +536,7 @@ export function useComposerSend(input: ComposerSendInput) {
       selectedProviderModels: ctxSelectedProviderModels,
       selectedPromptEffort: ctxSelectedPromptEffort,
       selectedModelSelection: ctxSelectedModelSelection,
+      potetoModeSkill: ctxPotetoModeSkill,
       interactionMode: sendInteractionMode,
       interactionModeEnabled: sendInteractionModeEnabled,
     } = sendCtx;
@@ -851,6 +855,8 @@ export function useComposerSend(input: ComposerSendInput) {
       models: ctxSelectedProviderModels,
       effort: ctxSelectedPromptEffort,
       text: messageTextForSend || ATTACHMENT_ONLY_BOOTSTRAP_PROMPT,
+      // A skill's instructions last the rest of the thread, so poteto mode loads it once.
+      leadingSkill: threadShellHasStarted(activeThread) ? null : ctxPotetoModeSkill,
     });
     if (composerRef.current?.validateProviderInput(outgoingMessageText) === false) {
       return;
@@ -878,6 +884,7 @@ export function useComposerSend(input: ComposerSendInput) {
       providerInstanceEntries,
       messageText: messageTextForSend,
       planModeEnabled,
+      potetoMode,
       interactionMode: sendInteractionMode,
     })) {
       if ("error" in resolved) {

@@ -1,9 +1,8 @@
 // @effect-diagnostics globalDate:off - cleanup times are ISO timestamps at the server boundary.
 /**
- * When a paused cloud machine is removed, and the sweep that removes it. Only a Namespace Devbox
- * costs money while paused (its volume is billed by the GB-month), so only a lease with a
- * `namespaceResource` is ever planned. An E2B sandbox pauses for free, and an instance-engine
- * chat's snapshot expires on its own.
+ * When a paused cloud machine is removed, and the sweep that removes it. A Namespace Devbox bills
+ * for its volume while paused, and an E2B sandbox would otherwise sleep forever, so both are
+ * planned. An instance-engine chat's snapshot expires on its own.
  *
  * @module cloudCleanup
  */
@@ -22,8 +21,12 @@ const BACKUP_RETRY_MS = 6 * 3_600_000;
 type CleanupThread = Pick<OrchestrationV2ThreadShell, "id" | "settledOverride" | "settledAt">;
 type CleanupLease = Pick<
   ProvisionedLease,
-  "namespaceResource" | "keep" | "state" | "updatedAt" | "owner"
+  "namespaceResource" | "provider" | "keep" | "state" | "updatedAt" | "owner"
 >;
+
+/** Whether cleanup ever removes the machine behind a lease: a Devbox or an E2B sandbox. */
+export const cleansUp = (lease: Pick<ProvisionedLease, "namespaceResource" | "provider">) =>
+  lease.namespaceResource !== undefined || lease.provider === "e2b";
 
 /**
  * Null when the machine is never removed. A paused box never runs a turn, since a pause refuses a
@@ -37,7 +40,7 @@ export function cleanupPlan(input: {
   readonly afterDays: number | null;
 }): ProvisionedCleanup | null {
   const { lease, thread, afterDays } = input;
-  if (!lease.namespaceResource) return null;
+  if (!cleansUp(lease)) return null;
   if (lease.keep && lease.state !== "disposed") return { kind: "kept", reason: lease.keep };
   if (lease.state !== "paused" || afterDays === null) return null;
   const pausedAt = Date.parse(lease.updatedAt);

@@ -323,15 +323,18 @@ it("builds the relay hook URL from the managed tunnel's key, never the environme
   }
 });
 
-it("roots webhook URLs on a public HTTPS origin, and nothing else", () => {
+it("roots webhook URLs on a public HTTPS URL, its path included, and nothing else", () => {
   assert.equal(
     ScheduledTaskService.publicHookBaseUrl("https://acid-hooks.example.com"),
     "https://acid-hooks.example.com/api/hooks",
   );
+  assert.equal(
+    ScheduledTaskService.publicHookBaseUrl("https://acid.example.com/u/3fa9c1/"),
+    "https://acid.example.com/u/3fa9c1/api/hooks",
+  );
   for (const origin of [
     "",
     "http://acid-hooks.example.com",
-    "https://acid-hooks.example.com/prefix",
     "https://user:pass@acid-hooks.example.com",
     "https://acid-hooks.example.com/?q=1",
     "acid-hooks.example.com",

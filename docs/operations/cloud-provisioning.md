@@ -29,6 +29,10 @@ A repository whose `namespace` entry sets `spare: true` and has prepare commands
 
 A host packed by `pack-host-state.ts` or `deploy-provision-manager.mjs` carries copies of `provisioning.homeFiles` and `provisioning.workspaceFiles`, except agent login files, which the host installs per account. `provisioning.workspaceFiles` land in every checkout whose repository entry names no `workspaceFiles` of its own; a repository entry's own `workspaceFiles` do not travel. With `githubToken` set, provisioning writes `.gitconfig`, `.git-credentials`, and `.config/gh/hosts.yml` itself, so the packer refuses a home file at any of those paths.
 
+## Sync CLI logins from a computer
+
+`t3 sessions setup --host <host URL> --token <token>` on a developer's computer sends the host the logins that common CLIs keep in files under the home: AWS config and its SSO and CLI caches, gcloud, kubectl and npm. `--path` replaces that list. On macOS it also installs a LaunchAgent that sends them again when they change and every 30 minutes. The token needs `settings:write`; `t3 auth session issue --scope settings:write --ttl 365d` on the host issues one. The host keeps the latest set in its secret store and writes it into the home of every awake cloud machine within 15 seconds. It writes it again each time a machine wakes, so a fresh `aws sso login` on the computer reaches agents that are already running. Settings → Connections → Cloud accounts lists what is synced and clears it; `t3 sessions remove` stops the sync and removes the logins from the host and its machines. Logins a CLI keeps in the macOS Keychain, such as `gh`'s and Docker's, do not sync, and neither do paths under `.t3`. Leave provider logins out: an agent CLI prefers a login file over the credential provisioning selected (see `credentialDestinations.ts`).
+
 ## Sign in Claude accounts
 
 A Claude account on macOS keeps its login in the keychain, and that login cannot be copied. Claude Code rotates its refresh token, so two machines sharing one login fork the chain and one of them is signed out. Give each Claude account a setup-token for cloud use instead:

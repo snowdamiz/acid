@@ -77,6 +77,7 @@ import { DISCONNECTED_COMPOSER_PLACEHOLDER } from "../../composerPlaceholder";
 import {
   deriveComposerSendState,
   getAntigravitySendBlockReason,
+  potetoModeInvocation,
   readFileAsDataUrl,
   resolveComposerInteractionMode,
   threadShellHasStarted,
@@ -277,6 +278,7 @@ import {
   resolveProviderSlashCommandsForCwd,
 } from "@t3tools/client-runtime/providerSkills";
 import { useDelayedStatus } from "../../hooks/useDelayedStatus";
+import { updateClientSettings } from "../../hooks/useSettings";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { useSoftwareKeyboardOpen } from "../../hooks/useSoftwareKeyboardOpen";
 import { useStableCallback } from "../../hooks/useStableCallback";
@@ -357,6 +359,8 @@ export interface ChatComposerHandle {
     selectedProvider: ProviderDriverKind;
     selectedModel: string;
     selectedProviderModels: ReadonlyArray<ServerProvider["models"][number]>;
+    /** Poteto mode's skill invocation while it is on and the agent has the skill. */
+    potetoModeSkill: string | null;
     interactionMode: ProviderInteractionMode;
     interactionModeEnabled: boolean;
     shownPendingApprovalIds: ReadonlyArray<RuntimeRequestId>;
@@ -1010,6 +1014,14 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
   const selectedProviderSkills = selectedProviderStatus
     ? resolveProviderSkillsForCwd(selectedProviderStatus, gitCwd, provisionedSkills)
     : NO_PROVIDER_SKILLS;
+  const potetoModeSkill = potetoModeInvocation(selectedProvider, selectedProviderSkills);
+  const potetoModeControl =
+    potetoModeSkill === null
+      ? null
+      : {
+          enabled: settings.potetoMode,
+          onToggle: () => void updateClientSettings({ potetoMode: !settings.potetoMode }),
+        };
   const selectedProviderSlashCommands = selectedProviderStatus
     ? resolveProviderSlashCommandsForCwd(selectedProviderStatus, gitCwd)
     : NO_PROVIDER_SLASH_COMMANDS;
@@ -2577,6 +2589,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       onPromptEdit={editPromptFromTraitsStable}
       planModeEnabled={settings.planModeEnabled}
       planModeUiEnabled={planModeUiEnabled}
+      potetoMode={potetoModeControl}
       interactionMode={interactionMode}
       compatibleRuntimeMode={compatibleRuntimeMode}
       compatibleRuntimeModeOptions={compatibleRuntimeModeOptions}
@@ -3306,6 +3319,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         selectedProvider,
         selectedModel,
         selectedProviderModels,
+        potetoModeSkill: settings.potetoMode ? potetoModeSkill : null,
         interactionMode,
         interactionModeEnabled: planModeUiEnabled,
       }),

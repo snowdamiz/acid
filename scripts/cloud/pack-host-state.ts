@@ -86,6 +86,12 @@ export interface PackInput {
    * packed credential.
    */
   readonly namespaceFederated?: boolean | undefined;
+  /**
+   * A host several developers share, each through a server of their own that holds their keys
+   * and accounts: only what every server shares travels, never a key, account, setting or
+   * credential file.
+   */
+  readonly shared?: boolean | undefined;
 }
 
 export interface HostState {
@@ -135,35 +141,39 @@ const tar = (args: ReadonlyArray<string>, input?: Buffer) => {
 
 /** Reads every credential up front, so a missing file fails before any host is touched. */
 export async function packHostState(input: PackInput): Promise<HostState> {
-  const { config } = input;
-  const e2bApiKey = config.e2bApiKey;
-  if (typeof e2bApiKey !== "string" || !e2bApiKey) throw new Error("E2B API key is missing");
+  const { config, shared = false } = input;
+  const e2bApiKey = shared ? "" : (config.e2bApiKey ?? "");
+  if (!shared && !e2bApiKey) throw new Error("E2B API key is missing");
   const templateId = config.provisioning?.templateId;
   if (!templateId) throw new Error("Configure provisioning.templateId before deploying a host");
 
-  const plan = planManagerAccounts({
-    settings: input.settings,
-    provisioning: config.provisioning ?? {},
-    accounts: input.accounts,
-    host: input.host,
-    managerBaseDir: input.baseDir,
-    codexHostLogins: input.codexHostLogins,
-  });
-  if (plan.accounts.length === 0) throw new Error("No provider account can travel");
+  const plan = shared
+    ? null
+    : planManagerAccounts({
+        settings: input.settings,
+        provisioning: config.provisioning ?? {},
+        accounts: input.accounts,
+        host: input.host,
+        managerBaseDir: input.baseDir,
+        codexHostLogins: input.codexHostLogins,
+      });
+  if (plan?.accounts.length === 0) throw new Error("No provider account can travel");
 
-  const files: Array<{ path: string; data: string | Buffer }> = [
-    {
-      path: plan.settingsPath,
-      // Hosts run the provider CLIs baked into their image or template as
-      // another user, so an in-app update can't install and wouldn't survive.
-      data: JSON.stringify({
-        enableProviderUpdateChecks: false,
-        providerInstances: plan.providerInstances,
-      }),
-    },
-  ];
+  const files: Array<{ path: string; data: string | Buffer }> = plan
+    ? [
+        {
+          path: plan.settingsPath,
+          // Hosts run the provider CLIs baked into their image or template as
+          // another user, so an in-app update can't install and wouldn't survive.
+          data: JSON.stringify({
+            enableProviderUpdateChecks: false,
+            providerInstances: plan.providerInstances,
+          }),
+        },
+      ]
+    : [];
   const codexLogins: Record<string, "host" | "copy"> = {};
-  for (const file of plan.files) {
+  for (const file of plan?.files ?? []) {
     const { codexLogin } = file;
     const hostLogin = codexLogin?.hostLogin
       ? await NodeFSP.readFile(codexLogin.hostLogin).catch((error: NodeJS.ErrnoException) => {
@@ -209,7 +219,7 @@ export async function packHostState(input: PackInput): Promise<HostState> {
   // Provisioning writes these for `githubToken` (ProvisionPreparation), and a
   // guest refuses a second, different file at the same path.
   const githubFiles = new Set(
-    config.provisioning?.githubToken
+    config.provisioning?.githubToken && !shared
       ? [".gitconfig", ".git-credentials", ".config/gh/hosts.yml"]
       : [],
   );
@@ -267,7 +277,7 @@ export async function packHostState(input: PackInput): Promise<HostState> {
   });
 
   const provisioning = config.provisioning;
-  const namespaceToken = config.namespaceToken;
+  const namespaceToken = shared ? undefined : config.namespaceToken;
   if (input.namespaceFederated && (namespaceToken || input.namespaceSession))
     throw new Error(
       "--namespace-federated reads the host's own token file; drop namespaceToken and --namespace-session",
@@ -276,7 +286,7 @@ export async function packHostState(input: PackInput): Promise<HostState> {
     namespaceToken || input.namespaceSession || input.namespaceFederated,
   );
   const { modalTokenId, modalTokenSecret } = config;
-  const modalAuthorized = Boolean(modalTokenId && modalTokenSecret);
+  const modalAuthorized = !shared && Boolean(modalTokenId && modalTokenSecret);
   // A repository entry's `workspaceFiles` name paths on this machine, so only
   // its E2B and Namespace settings travel. Namespace artifact paths live in
   // Namespace's storage, not on disk.
@@ -289,9 +299,9 @@ export async function packHostState(input: PackInput): Promise<HostState> {
     },
   );
   return {
-    accounts: plan.accounts,
-    skipped: [...plan.skipped, ...skippedFiles],
-    warnings: plan.warnings,
+    accounts: plan?.accounts ?? [],
+    skipped: [...(plan?.skipped ?? []), ...skippedFiles],
+    warnings: plan?.warnings ?? [],
     codexLogins,
     files,
     skills: bundles.flatMap(({ directory, archive }) =>
@@ -304,7 +314,7 @@ export async function packHostState(input: PackInput): Promise<HostState> {
       targets: [],
       provisioning: {
         templateId,
-        ...(provisioning?.githubToken ? { githubToken: provisioning.githubToken } : {}),
+        ...(provisioning?.githubToken && !shared ? { githubToken: provisioning.githubToken } : {}),
         // Carry the host's provisioning policy through. Dropping egressAllow left
         // provisioned environments without the allowlist their preparation needs,
         // which fails far from here as an unreachable package host.
@@ -317,7 +327,7 @@ export async function packHostState(input: PackInput): Promise<HostState> {
         // freezing a manifest reads every one of them, so the entries the manager
         // gets point at copies it owns. Carrying the host's paths verbatim made
         // every provision fail with an ENOENT naming another machine.
-        ...(plan.shellEnvironment ? { shellEnvironment: plan.shellEnvironment } : {}),
+        ...(plan?.shellEnvironment ? { shellEnvironment: plan.shellEnvironment } : {}),
         ...(homeFiles.length ? { homeFiles } : {}),
         ...(workspaceFiles.length ? { workspaceFiles } : {}),
         skills: bundles.map((bundle) => bundle.source),
@@ -403,7 +413,7 @@ export async function writeSeedArchive(input: {
 
 const USAGE = `Usage: node scripts/cloud/pack-host-state.ts --output FILE.tgz --base-dir DIR
        --broker-url https://HOST [--config FILE] [--settings FILE] [--accounts ID,ID,...]
-       [--namespace-session FILE | --namespace-federated] [--codex-host-logins DIR]
+       [--namespace-session FILE | --namespace-federated] [--codex-host-logins DIR] [--shared]
 
 Packs a provisioning host's state as a seed tarball rooted at --base-dir, for
 a container that runs the linux runtime artifact baked into its image. The
@@ -427,7 +437,12 @@ auth.json.packed-<output name>, and the next pack needs a fresh sign-in for
 it. An account without one carries a copy of this machine's login that cannot
 refresh and stops working when its access token expires. If the upload fails,
 upload the same tarball again; if the tarball is lost, rename each
-auth.json.packed-<output name> back to auth.json and pack again.`;
+auth.json.packed-<output name> back to auth.json and pack again.
+
+--shared packs a seed for a host that several developers share, each through a
+server of their own: it carries no key, account, setting or credential file,
+since each developer saves their own in Settings. Pair it with
+--namespace-federated for Namespace.`;
 
 if (import.meta.main) {
   const { values } = NodeUtil.parseArgs({
@@ -446,6 +461,7 @@ if (import.meta.main) {
       accounts: { type: "string" },
       "namespace-session": { type: "string" },
       "namespace-federated": { type: "boolean", default: false },
+      shared: { type: "boolean", default: false },
       "codex-host-logins": {
         type: "string",
         default: NodePath.join(NodeOS.homedir(), ".t3/host-codex"),
@@ -465,7 +481,7 @@ if (import.meta.main) {
 
   const state = await packHostState({
     config: JSON.parse(await NodeFSP.readFile(values.config, "utf8")),
-    settings: JSON.parse(await NodeFSP.readFile(values.settings, "utf8")),
+    settings: values.shared ? {} : JSON.parse(await NodeFSP.readFile(values.settings, "utf8")),
     accounts: values.accounts
       ?.split(",")
       .map((id) => id.trim())
@@ -476,6 +492,7 @@ if (import.meta.main) {
     namespaceSession: values["namespace-session"],
     namespaceFederated: values["namespace-federated"],
     codexHostLogins: values["codex-host-logins"],
+    shared: values.shared,
   });
   for (const { id, reason } of state.skipped) console.log(`skipping ${id}: ${reason}`);
   for (const warning of state.warnings) console.warn(`warning: ${warning}`);

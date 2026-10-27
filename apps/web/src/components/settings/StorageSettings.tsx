@@ -730,7 +730,7 @@ export function StorageSettingsPanel() {
           <SettingsRow
             title="Remove unused cloud machines"
             status={ruleStatus("cloudMachinesAfterDays")}
-            description="Remove a paused cloud machine that keeps billing for its disk after this many unused days, or an hour after it pauses once its chat is settled. Unpushed work is first pushed to a t3-backup branch. A machine whose work can't be pushed is kept."
+            description="Remove a paused Mac or E2B machine after this many unused days, or an hour after it pauses once its chat is settled, as when its pull request merges or closes. Unpushed work is first pushed to a t3-backup branch. A machine whose work can't be pushed is kept."
             serverScoped
             control={
               <RetentionControl

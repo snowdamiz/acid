@@ -34,6 +34,12 @@ export function createServerCloudAtoms<R, E>(
         Effect.timeout("40 seconds"),
       ),
   });
+  const sessionFiles = createEnvironmentQueryAtomFamily(runtime, {
+    label: "environment-data:cloud:session-files",
+    staleTimeMs: 5_000,
+    execute: (input: EnvironmentRpcInput<typeof WS_METHODS.environmentControlSessionFiles>) =>
+      request(WS_METHODS.environmentControlSessionFiles, input).pipe(Effect.timeout("20 seconds")),
+  });
   const provisionedEnvironments = createEnvironmentQueryAtomFamily(runtime, {
     label: "environment-data:cloud:provisioned",
     staleTimeMs: 5_000,
@@ -136,6 +142,16 @@ export function createServerCloudAtoms<R, E>(
       onSettled: (target, registry) =>
         Effect.sync(() =>
           registry.refresh(namespaceAccount({ environmentId: target.environmentId, input: {} })),
+        ),
+    }),
+    sessionFiles,
+    clearSessionFiles: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:cloud:clear-session-files",
+      tag: WS_METHODS.environmentControlClearSessionFiles,
+      concurrency: { mode: "singleFlight", key: ({ environmentId }) => environmentId },
+      onSettled: (target, registry) =>
+        Effect.sync(() =>
+          registry.refresh(sessionFiles({ environmentId: target.environmentId, input: {} })),
         ),
     }),
     provisionedEnvironments,
