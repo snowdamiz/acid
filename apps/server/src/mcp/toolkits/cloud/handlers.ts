@@ -19,7 +19,8 @@ import { EnvironmentControl } from "../../../environmentControl/EnvironmentContr
 import * as Project from "../../../project/ProjectService.ts";
 import { RepositoryIdentityResolver } from "../../../project/RepositoryIdentityResolver.ts";
 import * as McpToolAccess from "../../McpToolAccess.ts";
-import { readCaller, resolveProjectId, unavailable } from "../../threadAccess.ts";
+import * as McpInvocationContext from "../../McpInvocationContext.ts";
+import { loadCaller, resolveProjectId, unavailable } from "../../threadAccess.ts";
 import { CloudToolkit } from "./tools.ts";
 
 /**
@@ -74,7 +75,13 @@ export const layer = McpToolAccess.toLayer(CloudToolkit, {
     (input) => input,
     (input, { runtimeMode, interactionMode }) =>
       Effect.gen(function* () {
-        const context = yield* readCaller();
+        const scope = yield* McpInvocationContext.McpInvocationContext;
+        if (!scope.capabilities.has("orchestration") && !scope.capabilities.has("cloud-launch"))
+          return yield* new OrchestratorMcpFailure({
+            code: "capability_denied",
+            message: "This credential cannot start cloud chats.",
+          });
+        const context = yield* loadCaller();
         const control = yield* EnvironmentControl;
         const offered = yield* control.provisionProviders.pipe(
           Effect.orElseSucceed((): ReadonlyArray<ProvisionProvider> => []),

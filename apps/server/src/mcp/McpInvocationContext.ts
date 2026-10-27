@@ -17,6 +17,8 @@ const ALL_MCP_CAPABILITIES = [
   "worktree",
   "device",
   "pull-requests",
+  // Only t3_cloud_chat_launch: what an automation on a cloud-only host gets instead of the rest.
+  "cloud-launch",
 ] as const;
 export type McpCapability = (typeof ALL_MCP_CAPABILITIES)[number];
 

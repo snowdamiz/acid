@@ -54,6 +54,7 @@ import {
 } from "@t3tools/provider-core/server/failure";
 import * as RunExecutionService from "./RunExecutionService.ts";
 import * as RuntimePolicy from "./RuntimePolicy.ts";
+import { AUTOMATION_HOST_DRIVER_MESSAGE, localAgentRunsEnabled } from "./cloudOnlyHost.ts";
 import {
   isRestartNoteContinuation,
   pendingRestartCancelledBackgroundWork,
@@ -134,6 +135,7 @@ export const layer: Layer.Layer<
     const providerSessions = yield* ProviderSessionManager.ProviderSessionManagerV2;
     const runExecution = yield* RunExecutionService.RunExecutionServiceV2;
     const runtimePolicy = yield* RuntimePolicy.RuntimePolicyV2;
+    const localAgentRuns = yield* localAgentRunsEnabled;
     const isManagedWorktreePath = yield* makeIsManagedWorktreePath;
 
     // These callbacks outlive startup while a run drains background work. Build
@@ -672,6 +674,17 @@ export const layer: Layer.Layer<
       }
       const session = sessionResult.success;
       if (!(yield* isCurrentAttemptInStatus("starting"))) return;
+      if (!localAgentRuns && session.driver !== "claudeAgent") {
+        yield* settleStartFailure({
+          signal: "provider-session-open-failure",
+          title: "Provider turn failed to start",
+          error: new ProviderTurnStartError({
+            runId,
+            cause: new Error(AUTOMATION_HOST_DRIVER_MESSAGE),
+          }),
+        });
+        return;
+      }
       const loadFromProvider = Effect.fn("ProviderTurnStartService.loadFromProvider")(function* (
         load: Effect.Effect<OrchestrationV2ProviderThread, ProviderAdapter.ProviderAdapterV2Error>,
       ) {

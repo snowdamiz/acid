@@ -47,6 +47,7 @@ import * as ProjectionStore from "./ProjectionStore.ts";
 import * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
 import * as ProviderSessionManager from "./ProviderSessionManager.ts";
 import * as ProviderTurnStart from "./ProviderTurnStartService.ts";
+import { AUTOMATION_HOST_DRIVER_MESSAGE } from "./cloudOnlyHost.ts";
 import * as RunExecutionService from "./RunExecutionService.ts";
 import * as RuntimePolicy from "./RuntimePolicy.ts";
 
@@ -62,10 +63,13 @@ const normalize = (target: string) => {
   }
   return `/${parts.join("/")}`;
 };
-const layerWorktreeLocation = (worktreesDir = managedWorktreesDir) =>
+const layerWorktreeLocation = (worktreesDir = managedWorktreesDir, localAgentRuns = true) =>
   Layer.mergeAll(
     Path.layer,
-    Layer.mock(ServerConfig.ServerConfig)({ worktreesDir } as ServerConfig.ServerConfig["Service"]),
+    Layer.mock(ServerConfig.ServerConfig)({
+      worktreesDir,
+      localAgentRuns,
+    } as ServerConfig.ServerConfig["Service"]),
     ServerSettings.layerTest(),
   );
 
@@ -269,6 +273,8 @@ function makeLocalCommandHarness(input: {
   readonly previousMessages?: ReadonlyArray<string>;
   readonly logoutFailure?: string;
   readonly openFailure?: unknown;
+  /** A cloud-only host, whose only runs are its automations. */
+  readonly automationHost?: boolean;
   readonly ensureThreadFailure?: unknown;
   readonly historyReadFailureAfterFallback?: unknown;
   /**
@@ -846,7 +852,7 @@ function makeLocalCommandHarness(input: {
             }),
         }),
         IdAllocator.layer,
-        layerWorktreeLocation(input.worktreesDir),
+        layerWorktreeLocation(input.worktreesDir, input.automationHost !== true),
         input.fileSystem === undefined
           ? FileSystem.layerNoop({ exists: () => Effect.succeed(true) })
           : Layer.succeed(FileSystem.FileSystem, input.fileSystem),
@@ -1273,6 +1279,26 @@ effectIt.effect("terminalizes a starting run when its provider session cannot op
       },
     ]);
   }),
+);
+
+effectIt.effect(
+  "fails a run on a cloud-only host whose provider cannot run without built-in tools",
+  () =>
+    Effect.gen(function* () {
+      const harness = makeLocalCommandHarness({
+        text: "Decide where this issue gets fixed.",
+        automationHost: true,
+        deliverTurn: { earlierTurn: false },
+      });
+
+      yield* harness.start;
+
+      expect(harness.deliveredTexts).toEqual([]);
+      expect(harness.projection().runs.at(-1)?.status).toBe("failed");
+      expect(JSON.stringify(harness.projection().turnItems)).toContain(
+        AUTOMATION_HOST_DRIVER_MESSAGE,
+      );
+    }),
 );
 
 effectIt.effect("leaves the run starting when a session-open failure will be retried", () =>

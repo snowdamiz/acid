@@ -34,6 +34,7 @@ const harness = (input: {
   readonly offered: ReadonlyArray<ProvisionProvider>;
   readonly identity: Partial<RepositoryIdentity> | null;
   readonly requests: Ref.Ref<ReadonlyArray<EnvironmentProvisionInput>>;
+  readonly capabilities?: ReadonlyArray<McpInvocationContext.McpCapability>;
 }) =>
   McpToolAccess.HandlersLayer.layer(CloudHandlers.layer).pipe(
     Layer.provideMerge(
@@ -48,7 +49,9 @@ const harness = (input: {
             providerInstanceId: ProviderInstanceId.make("codex"),
           },
           client: undefined,
-          capabilities: new Set(["orchestration" as const]),
+          capabilities: new Set<McpInvocationContext.McpCapability>(
+            input.capabilities ?? ["orchestration"],
+          ),
           issuedAt: 0,
         }),
         Layer.mock(ThreadManagement.ThreadManagementService)({
@@ -152,5 +155,31 @@ it.effect(
       });
       expect(noRepository.at(-1)?.result).toMatchObject({ code: "invalid_request" });
       expect(yield* Ref.get(requests)).toEqual([]);
+    }),
+);
+
+it.effect(
+  "lets an automation's cloud-launch credential start a cloud chat, and no credential without it",
+  () =>
+    Effect.gen(function* () {
+      const requests = yield* Ref.make<ReadonlyArray<EnvironmentProvisionInput>>([]);
+      const identity = { owner: "snowdamiz", name: "sigentic" };
+      const automation = yield* Effect.gen(function* () {
+        const call = yield* launch({ provider: "e2b" }).pipe(Effect.forkChild);
+        yield* TestClock.adjust("50 seconds");
+        return (yield* Fiber.join(call)).at(-1)?.result;
+      }).pipe(
+        Effect.provide(
+          harness({ offered: ["e2b"], identity, requests, capabilities: ["cloud-launch"] }),
+        ),
+      );
+      const worktreeOnly = yield* launch({ provider: "e2b" }).pipe(
+        Effect.provide(
+          harness({ offered: ["e2b"], identity, requests, capabilities: ["worktree"] }),
+        ),
+      );
+      expect(automation).toMatchObject({ provider: "e2b", status: "starting" });
+      expect(worktreeOnly.at(-1)?.result).toMatchObject({ code: "capability_denied" });
+      expect(yield* Ref.get(requests)).toHaveLength(1);
     }),
 );
