@@ -27,6 +27,7 @@ const fixture = async (
     > = {},
   namespaceSession?: string,
   namespaceFederated?: boolean,
+  shared?: boolean,
 ) => {
   const home = await NodeFSP.mkdtemp(NodePath.join(NodeOS.tmpdir(), "t3-pack-host-state-"));
   const write = async (path: string, data: string) => {
@@ -112,6 +113,7 @@ const fixture = async (
     namespaceSession:
       namespaceSession === undefined ? undefined : NodePath.join(home, "ns/token.json"),
     namespaceFederated,
+    shared,
   });
   return { home, packed };
 };
@@ -304,6 +306,38 @@ describe("packHostState", () => {
       (error: Error) => error.message,
     );
     assert.include(conflict, "--namespace-federated");
+  });
+
+  it("carries no key, account, setting or credential file for a shared host", async () => {
+    const { home, packed } = await fixture(
+      {
+        githubToken: "gh-token",
+        modalTokenId: "ak-1",
+        modalTokenSecret: "as-1",
+        homeFiles: [{ source: "gitconfig", destination: ".config/acid.md" }],
+      },
+      undefined,
+      true,
+      true,
+    );
+    try {
+      assert.deepEqual(packed.accounts, []);
+      assert.deepEqual(
+        packed.files.map((file) => file.path),
+        ["/data/t3/home-files/0"],
+      );
+      assert.equal(packed.config.e2bApiKey, "");
+      assert.isUndefined(packed.config.modalTokenId);
+      const { provisioning } = packed.config;
+      for (const key of ["githubToken", "claudeOAuthTokens", "shellEnvironment", "modal"])
+        assert.notProperty(provisioning, key);
+      assert.deepEqual(provisioning.namespace, { size: "m" });
+      assert.deepEqual(provisioning.homeFiles, [
+        { source: "/data/t3/home-files/0", destination: ".config/acid.md" },
+      ]);
+    } finally {
+      await NodeFSP.rm(home, { recursive: true, force: true });
+    }
   });
 
   it("rejects a Namespace session file without quoting it", async () => {
